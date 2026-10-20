@@ -109,3 +109,9 @@ $RECYCLE.BIN/
 # Claude Code CLI: personal, per-user overrides — never the shared
 # .claude/settings.json.
 .claude/settings.local.json
+
+### Node (package) ###
+node_modules
+*.tsbuildinfo
+coverage/
+*.tgz

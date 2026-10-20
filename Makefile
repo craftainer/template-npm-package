@@ -1,33 +1,38 @@
-# The release contract release.yml drives -- see docs/TEMPLATE.md's
-# "Release: a Makefile contract" section. This template itself ships no
-# artifact, so every target is a documented no-op; an instance reimplements
-# each target for its own artifact type (an OCI image, a package, a chart,
-# ...) without needing to touch release.yml.
+# template-npm-package's implementation of template-base's release contract
+# (docs/TEMPLATE.md, "Release: a Makefile contract"). release.yml sets
+# RELEASE_VERSION / RELEASE_TAG / RELEASE_ARCH -- see there. One pure-JS
+# tarball is built once, on one arch; the version lives only in the git tag
+# and `build` stamps it. The logic is in scripts/release-*.sh; release-run.sh
+# runs it on the host, or in the pinned Node image when the host has no pnpm
+# (release.yml's bare runner). NPM_PUBLISH (a repository variable; any
+# non-empty value) turns publishing on -- see scripts/README.md.
 
 .PHONY: release-arches build sbom release-assets publish release-check finalize
 
-# Prints (only) a JSON array of the arches to build on, once, first. Each
-# arch then runs build/sbom/release-assets/publish natively on its own runner.
 release-arches:
 	@echo '["amd64"]'
 
+# Leaves only the packed tarball in dist/: dist/ is what release.yml attaches
+# to the GitHub release.
 build:
-	@echo "template-base ships no artifact -- nothing to build."
+	scripts/release-run.sh scripts/release-build.sh
 
 sbom:
-	@echo "template-base ships no artifact -- nothing to scan."
+	scripts/release-sbom.sh
 
 release-assets:
-	@mkdir -p dist
+	@set -e; for pat in 'dist/*.tgz' 'dist/*.spdx.json'; do \
+		ls $$pat >/dev/null 2>&1 || { echo "missing release asset: $$pat" >&2; exit 1; }; \
+	done; ls dist
 
 publish:
-	@echo "template-base ships no artifact -- nothing to publish."
+	scripts/release-run.sh scripts/release-publish.sh
 
-# Runs once after every arch leg, inside the devcontainer with the stack up.
+# Runs once after the arch leg, inside the devcontainer; dist/ holds the
+# downloaded tarball. See scripts/release-check.sh.
 release-check:
-	@echo "template-base ships no artifact -- nothing to check."
+	scripts/release-check.sh
 
-# Runs once after release-check, on the host runner (e.g. combine per-arch
-# registry tags into a multi-arch manifest list).
+# Nothing to combine: a single tarball is built once.
 finalize:
-	@echo "template-base ships no artifact -- nothing to finalize."
+	@echo "Single pure-JS tarball -- nothing to finalize."

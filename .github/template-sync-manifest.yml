@@ -10,12 +10,11 @@
 # wants a template-owned path gone for good should move its pattern to
 # "ignore" in a template release rather than deleting the file locally.
 #
-# This is template-base's own manifest, classifying the generic subset it
-# ships, and it is itself "merge" tier: a repo that's both an instance of
-# template-base and its own template for further instances (e.g.
-# template-fastapi) edits this file directly, covering its own (larger)
-# tracked-file set, and resolves base's additions by hand -- see that repo's
-# docs/TEMPLATE.md.
+# This started as template-base's own manifest and is itself "merge" tier:
+# template-npm-package is both an instance of template-base and its own
+# template for further instances, so it edits this file directly, covering
+# its own (larger) tracked-file set, and resolves base's additions by hand --
+# see that repo's docs/TEMPLATE.md.
 #
 # An instance that isn't itself a template doesn't edit this file; it lists
 # its own files (e.g. src/) in ../template-sync-manifest.local.yml instead --
@@ -62,6 +61,18 @@ replace:
   - scripts/post-create.sh
   - scripts/develop.d/README.md
   - scripts/post-create.d/README.md
+
+  # template-npm-package's own layer on top of base: the post-create hook
+  # that installs the pnpm dependencies and the Corepack hook that enables
+  # pnpm. Both are instance-agnostic, so fixes reach every package through a
+  # sync. Hook scripts are listed one by one, not as base's `*.sh` globs: an
+  # instance's own extra hook scripts go in its
+  # template-sync-manifest.local.yml.
+  - scripts/develop.d/10-corepack.sh
+  - scripts/post-create.d/10-pnpm-install.sh
+  # The release logic behind the Makefile's thin targets (sourced lib, build,
+  # SBOM, publish, check), likewise instance-agnostic.
+  - scripts/release-*.sh
   - .secrets/README.md
   - .secrets/.gitkeep
 
@@ -82,9 +93,26 @@ ignore:
   # Each instance chooses its own license and copyright holder.
   - LICENSE
 
+  # The package scaffold: an instance renames the package (to
+  # @craftainer/<name>), owns its dependencies, entry points, code and tests,
+  # so none of it can be synced. The tool configs are scaffold too: they
+  # name this package's entries (tsdown.config.ts) and coverage scope.
+  - package.json
+  - tsconfig*.json
+  - tsdown.config.ts
+  - vitest.config.ts
+  - src/
+  - tests/
+
+  # Derived from package.json; a 3-way merge of a lock file is unreliable,
+  # and the dependency set is the instance's own, so an instance regenerates
+  # it with `pnpm install`.
+  - pnpm-lock.yaml
+
   # The release-artifact contract (see docs/TEMPLATE.md's "Release: a
   # Makefile contract" section) is the whole point that this differs per
-  # instance -- template-owned in shape only, never in content.
+  # instance -- template-owned in shape only, never in content. Here it is a
+  # thin caller of scripts/release-*.sh, which are template-owned.
   - Makefile
 
   # Product/domain knowledge and working plans: instance-owned from the
@@ -103,10 +131,10 @@ ignore:
 
   # Instance hook files (see docs/TEMPLATE.md's "Instance extension
   # points"): an instance's own compose fragment and the scripts it drops
-  # into the two hook directories.
+  # into the hook directories. The two hook directories have no `*.sh` glob
+  # here: this template ships its own scripts in them (see the replace tier),
+  # and an instance lists its extra scripts in its local manifest.
   - .devcontainer/compose.instance.yml
-  - scripts/develop.d/*.sh
-  - scripts/post-create.d/*.sh
 
   # An instance's own extra "ignore" patterns for paths this manifest can't
   # know about (see docs/TEMPLATE.md's "Template sync" section).
@@ -131,6 +159,11 @@ merge:
   - .pre-commit-config.yaml
   - .mcp.json
   - .gitignore
+  # Lint/format config shared by every package, which an instance extends
+  # with its own rules.
+  - .oxlintrc.json
+  - .prettierrc.json
+  - .prettierignore
   - scripts/README.md
   - docs/TEMPLATE.md
 
