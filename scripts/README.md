@@ -8,9 +8,22 @@
   either.
 - `post-create.sh` — the devcontainer's `postCreateCommand`: git
   `safe.directory`, `prek install`, then every `post-create.d/*.sh`.
-- `develop.d/`, `post-create.d/` — instance hook directories, empty apart
-  from their own `README.md`; see `docs/TEMPLATE.md`'s "Instance extension
-  points".
+- `release-*.sh` — the release logic behind the `Makefile` targets (see
+  `docs/TEMPLATE.md`, "Package template notes"). `release-lib.sh` (sourced)
+  pins the npm and Syft versions; `release-run.sh` runs a script on the
+  host, or in the pinned Node image when the host has no pnpm;
+  `release-build.sh` stamps the version, builds and packs into `dist/`;
+  `release-sbom.sh` (+ `release-sbom-install.sh`) writes the SPDX SBOM;
+  `release-publish.sh` skips, stages with the bootstrap token
+  (`npm stage publish`) or publishes through OIDC; `release-check.sh`
+  installs the `dist/` tarball into a scratch project and imports every
+  `exports` entry, then, if `NPM_PUBLISH` is set, does the same from the
+  registry (a version not there yet, e.g. staged and unapproved, is a
+  notice, not a failure).
+- `develop.d/`, `post-create.d/` — instance hook directories. This template
+  ships `develop.d/10-corepack.sh` (enables pnpm) and
+  `post-create.d/10-pnpm-install.sh` (installs dependencies); a package adds
+  its own scripts after them.
 
 ## Do
 
@@ -18,8 +31,12 @@
   ARG in `../.devcontainer/Dockerfile`) and checksum-verified where the upstream project
   publishes checksums, matching the pattern each install step here already
   follows.
+- Keep `NPM_VERSION` in `release-lib.sh` at 11.15.0 or later (staged
+  publishing) and pin it exactly, with its `# renovate:` marker.
 
 ## Don't
 
+- Set or export `NODE_AUTH_TOKEN` in a release script, even empty: npm's
+  OIDC trusted publishing breaks if it is present.
 - Add a language runtime or stack-specific tool here — that belongs in the
   instance's own layer (`develop.d/`), not the base template's.

@@ -248,6 +248,23 @@ the registry push) carry the same label set, computed once by
   it's one stable prefix per org across every repo/template instance
   that org owns, rather than a per-repo namespace to look up each time.
 
+## npm publishing
+
+`make publish` (see the root `README.md`) publishes to npm. `release.yml`
+needs `id-token: write` on the job that runs it (template-base's grants it).
+
+- `NPM_PUBLISH` (variable) — empty or unset skips publishing; any other
+  value publishes. Set it per repository.
+- `NPM_TOKEN` (secret, bootstrap only) — a granular token with "Read and
+  write (stage only)". `release.yml` passes it to `make publish` only, and
+  empty when the secret is unset (treated as absent). While it is set,
+  `make publish` runs `npm stage publish` and a maintainer approves the
+  staged version with 2FA; once the package's trusted publisher is
+  configured on npmjs.com, delete the secret and releases publish through
+  OIDC with provenance.
+- Never map `NPM_TOKEN` (or anything) to `NODE_AUTH_TOKEN`: npm's OIDC
+  trusted publishing breaks if it is set, even empty.
+
 ## Release variables and secrets
 
 `release.yml` passes these to the Makefile targets as environment
@@ -268,8 +285,8 @@ cleanly when the registry isn't configured.
   nothing broader (`template-sync.yml` also needs `pull-requests:
   write`, for nothing else); leave `checks.yml` at `contents: read`.
 - Keep `id-token: write` on `release.yml`'s `build` job only (the one
-  running `make publish`): PyPI trusted publishing via GitHub OIDC. It
-  is unused by repos that don't publish to PyPI.
+  running `make publish`): npm trusted publishing via GitHub OIDC. It
+  is unused by repos that don't publish to npm.
 
 ## Don't
 

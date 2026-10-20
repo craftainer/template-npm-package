@@ -70,6 +70,9 @@ replace:
   # template-sync-manifest.local.yml.
   - scripts/develop.d/10-corepack.sh
   - scripts/post-create.d/10-pnpm-install.sh
+  # The release logic behind the Makefile's thin targets (sourced lib, build,
+  # SBOM, publish, check), likewise instance-agnostic.
+  - scripts/release-*.sh
   - .secrets/README.md
   - .secrets/.gitkeep
 
@@ -108,7 +111,8 @@ ignore:
 
   # The release-artifact contract (see docs/TEMPLATE.md's "Release: a
   # Makefile contract" section) is the whole point that this differs per
-  # instance -- template-owned in shape only, never in content.
+  # instance -- template-owned in shape only, never in content. Here it is a
+  # thin caller of scripts/release-*.sh, which are template-owned.
   - Makefile
 
   # Product/domain knowledge and working plans: instance-owned from the

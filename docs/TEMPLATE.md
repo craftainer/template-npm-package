@@ -40,8 +40,9 @@ artifact on top of the shape described here.
   an instance hook directory (`develop.d/`, `post-create.d/`); see
   `scripts/README.md` and "Instance extension points" below.
 - `Makefile` — the release contract `release.yml` drives
-  (`build`/`sbom`/`release-assets`/`publish`), each a documented no-op
-  here — see "Release: a Makefile contract" below.
+  (`build`/`sbom`/`release-assets`/`publish`/`release-check`); in this
+  template it builds, SBOMs, publishes and checks an npm tarball — see
+  "Release: a Makefile contract" and "Package template notes" below.
 - `.pre-commit-config.yaml` — git hooks, run by `prek` or `pre-commit`;
   language-agnostic hooks only.
 - `CLAUDE.md` — the AI-assisted coding workflow Claude Code follows in
@@ -222,6 +223,115 @@ unpinned apt package, and stays on `PATH` afterward. Node.js exists
 because `npx` (the `clear-thought` MCP server in `.mcp.json`) needs it.
 An instance that adds Python or Node.js as its own application runtime
 can reuse these directly rather than installing a second copy.
+
+## Package template notes
+
+`template-npm-package` extends `template-base` for an ESM TypeScript npm
+package. The sections above still apply, except where noted; these are the
+package-specific additions. `../docs/adrs/0001-npm-package-template.md`
+records why.
+
+- **Package scaffold (instance-owned, `ignore` tier).** `package.json`,
+  `tsconfig*.json`, `tsdown.config.ts`, `vitest.config.ts`, `src/`,
+  `tests/` and `pnpm-lock.yaml`. A package renames `name` to
+  `@craftainer/<name>` (npm's org-scope convention; the template's own
+  unscoped name is a placeholder), owns its dependencies, entry points, code
+  and tests, and regenerates the lockfile with `pnpm install`. Tool
+  *versions* are kept fresh by Renovate, not by sync.
+- **Template-owned tooling (`replace` tier).** `scripts/release-*.sh` (the
+  release logic below), `scripts/develop.d/10-corepack.sh` (enables pnpm
+  through Corepack, which reads `packageManager`) and
+  `scripts/post-create.d/10-pnpm-install.sh` (`pnpm install
+  --frozen-lockfile`). Don't edit them in a package; change them here and
+  release a new tag. This also supersedes base's "hook directories ship
+  empty" wording: these two hooks ship here, and a package lists its own
+  extra hook scripts under `ignore:` in
+  `.github/template-sync-manifest.local.yml`. The `Makefile` stays `ignore`
+  (a thin caller of those scripts) and is instance-owned.
+- **Checks and their order.** `prek run --all-files --hook-stage manual`
+  runs oxlint, `prettier --check`, `tsc --noEmit`, `vitest` with the 100%
+  coverage gate, then `tsdown`, `publint --strict` and `attw --pack .
+  --profile esm-only`, then the lockfile check. The build must come before
+  publint and attw: they inspect the built `dist/`, and prek runs hooks in
+  file order. Every tool is a dev-dependency run through `pnpm exec`, so
+  `package.json` is the single source of tool versions.
+- **`exports` and `entry` move together.** The `exports` map in
+  `package.json` is hand-written and `tsdown.config.ts`'s `entry` is the
+  list of files it points to; add or remove a subpath in both, and publint
+  and attw fail when they disagree. `isolatedDeclarations` is on, so every
+  public export needs an explicit type annotation (the declaration emit
+  does not infer).
+- **Node lives in two places.** `.devcontainer/Dockerfile`'s `NODE_VERSION`
+  (the toolchain) and `package.json`'s `engines.node` (what consumers need).
+  Change them together. The release scripts read the Dockerfile's value to
+  pick the Node image when the host runner has no pnpm.
+- **Release.** See below.
+
+### Release
+
+One pure-JS tarball, built once (`release-arches` prints `["amd64"]`). As in
+`template-python-package`, the version lives only in the git tag:
+`package.json` stays at `0.0.0` and `make build` stamps `RELEASE_VERSION`
+into the build (restored on exit, never committed).
+
+| Target | What it does |
+|---|---|
+| `build` | `pnpm install --frozen-lockfile`, stamp the version, `pnpm build`, `npm pack`; leaves only `<name>-<version>.tgz` in `dist/` (which `release.yml` attaches to the GitHub release, so tsdown's output must not stay there) |
+| `sbom` | installs the tarball (production dependencies, no scripts) into a scratch project and scans it with Syft (`dir:`, `-o spdx-json`) into `dist/<name>-<version>.spdx.json` |
+| `release-assets` | checks the tarball and SBOM are in `dist/` |
+| `publish` | see below; publishes the tarball from `dist/`, so the artifact is exactly what was SBOM'd |
+| `release-check` | `scripts/release-check.sh`, in the devcontainer |
+| `finalize` | nothing to combine |
+
+`build` and `publish` run through `scripts/release-run.sh`: on the host when
+it has pnpm (the devcontainer), else in the `node:<NODE_VERSION>` image (the
+bare runner `release.yml` uses, which has docker only). Every npm call uses
+the exact npm pinned in `scripts/release-lib.sh` (`npx npm@<version>`),
+since staged publishing needs npm 11.15.0 or later and OIDC trusted
+publishing 11.5.1 or later, and the Node in the devcontainer may ship an
+older one.
+
+**`publish`** reads `NPM_PUBLISH` (a repository variable) and `NPM_TOKEN` (a
+secret that `release.yml` passes to `make publish` only; empty means absent):
+
+| `NPM_PUBLISH` | `NPM_TOKEN` | Does |
+|---|---|---|
+| empty | any | skips |
+| set | empty | `npm publish --provenance --access public` through OIDC trusted publishing (the build job's `id-token: write`); no stored credential |
+| set | set | bootstrap: `npm stage publish` with the token, passed in a temporary `--userconfig` npmrc that is deleted afterwards; prints how to approve |
+
+A package has no trusted publisher before its first release, and npm has no
+pending publishers (unlike PyPI), so the first release uses a bootstrap
+token created as "Read and write (stage only)" — npm is removing direct
+publishing for 2FA-bypass tokens. `npm stage publish` uploads the tarball
+to a staging area without 2FA and creates a public `0.0.0-stage`
+placeholder; the real version stays private until a maintainer approves it
+with 2FA (`npm stage list`, then `npm stage approve <stage-id>`, or on
+npmjs.com). Afterwards configure the package's trusted publisher on
+npmjs.com (repository, workflow `release.yml`), delete the `NPM_TOKEN`
+secret, and later releases take the OIDC path. npm expires a trusted
+publisher that has not published within 48 hours of being configured.
+Prereleases (`1.2.3-rc.1`) are published under their identifier as the
+dist-tag (`rc`), never `latest`, since npm refuses a prerelease without an
+explicit tag.
+
+`NODE_AUTH_TOKEN` must stay unset everywhere (even empty): npm's OIDC
+trusted publishing breaks if it is present. `publish` unsets it
+defensively; never map `NPM_TOKEN` to it in a workflow.
+
+**`release-check`** always installs the `dist/` tarball into a scratch
+project and imports every `exports` entry (ESM, Node), checking the
+installed version. When `NPM_PUBLISH` is set it then looks the version up
+with `npm view`: if found it is installed from the registry and imported
+too; if not, it prints a "not yet on the registry (staged, awaiting
+approval?)" notice and passes, because a staged release is not installable
+until approved. Any other lookup failure (network, auth) fails the check.
+The template itself never publishes (`NPM_PUBLISH` unset) but its release
+must pass the tarball check.
+
+References: [staged publishing](https://docs.npmjs.com/staged-publishing),
+[`npm stage`](https://docs.npmjs.com/cli/v12/commands/npm-stage),
+[trusted publishing](https://docs.npmjs.com/trusted-publishers).
 
 ## Code style
 
