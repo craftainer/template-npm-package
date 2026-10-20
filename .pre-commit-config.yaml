@@ -23,10 +23,18 @@ repos:
         stages: [pre-commit, manual]
       - id: check-yaml
         stages: [pre-commit, manual]
+        # pnpm 12's own package-manager self-management (see package.json's
+        # `packageManager` field) writes pnpm-lock.yaml as two concatenated
+        # YAML documents (its own platform-binary packages, then the actual
+        # project lockfile) -- valid pnpm, not valid single-document YAML.
+        exclude: ^pnpm-lock\.yaml$
       - id: check-toml
         stages: [pre-commit, manual]
       - id: check-json
         stages: [pre-commit, manual]
+        # tsconfig*.json is TypeScript's own JSONC dialect (comments,
+        # trailing commas), not strict JSON.
+        exclude: ^tsconfig.*\.json$
       - id: check-added-large-files
         stages: [pre-commit, manual]
       - id: check-merge-conflict
@@ -48,8 +56,77 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
+  # Every tool below is a project dev-dependency (see package.json) -- running
+  # them via `pnpm` keeps their pinned versions as the single source of truth
+  # instead of a second, separate pin per tool in this file. The build, publint
+  # and attw hooks run in this order (prek runs hooks sequentially) because the
+  # last two inspect the built `dist/`.
   - repo: local
     hooks:
+      - id: oxlint
+        name: oxlint
+        entry: pnpm exec oxlint
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, manual]
+
+      - id: prettier-check
+        name: prettier --check
+        entry: pnpm exec prettier --check .
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit, manual]
+
+      - id: typecheck
+        name: tsc --noEmit
+        entry: pnpm exec tsc --noEmit
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
+      - id: vitest
+        name: vitest (100% coverage gate)
+        entry: pnpm exec vitest run --coverage
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
+      - id: build
+        name: tsdown build
+        entry: pnpm exec tsdown
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
+      - id: publint
+        name: publint (package.json against dist/)
+        entry: pnpm exec publint --strict
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
+      - id: attw
+        name: arethetypeswrong (esm-only profile)
+        entry: pnpm exec attw --pack . --profile esm-only
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
+      - id: lockfile-check
+        name: pnpm-lock.yaml matches package.json
+        entry: pnpm install --frozen-lockfile --lockfile-only
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push, manual]
+
       - id: template-sync-manifest
         name: template-sync-manifest (every tracked path classified)
         entry: python3 .github/scripts/template_sync_manifest.py
