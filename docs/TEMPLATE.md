@@ -135,8 +135,8 @@ unchanged across every instance), then drives these targets:
 | Target | Runs | Where | Env available |
 |---|---|---|---|
 | `release-arches` | once, first | host runner | none; must print a JSON array on stdout, e.g. `["amd64"]` |
-| `build`, `sbom`, `release-assets`, `publish` | once **per arch**, in that order | host runner for that arch | `RELEASE_VERSION`, `RELEASE_TAG`, `RELEASE_ARCH`, `OCI_REGISTRY`, `OCI_IMAGE_NAME`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_PASSWORD`, all `GITHUB_*` |
-| `release-check` | once, after all arches | **inside the devcontainer** (`devcontainers/ci`), stack up | `RELEASE_VERSION`, `RELEASE_TAG` |
+| `build`, `sbom`, `release-assets`, `publish` | once **per arch**, in that order | host runner for that arch | `RELEASE_VERSION`, `RELEASE_TAG`, `RELEASE_ARCH`, `OCI_REGISTRY`, `OCI_IMAGE_NAME`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_PASSWORD`, `PYPI_PUBLISH`, `NPM_PUBLISH`, `CARGO_PUBLISH`, all `GITHUB_*`; on `publish` only, `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` (bootstrap secrets; empty when unset, so treat empty as absent) |
+| `release-check` | once, after all arches | **inside the devcontainer** (`devcontainers/ci`), stack up | `RELEASE_VERSION`, `RELEASE_TAG`, `PYPI_PUBLISH`, `NPM_PUBLISH`, `CARGO_PUBLISH` |
 | `finalize` | once, after `release-check` | host runner | same as per-arch minus `RELEASE_ARCH` |
 
 What each target is for: `build` produces the release artifact(s) (an
@@ -253,8 +253,8 @@ records why.
   coverage gate, then `tsdown`, `publint --strict` and `attw --pack .
   --profile esm-only`, then the lockfile check. The build must come before
   publint and attw: they inspect the built `dist/`, and prek runs hooks in
-  file order. Every tool is a dev-dependency run through `pnpm exec`, so
-  `package.json` is the single source of tool versions.
+  file order. Every hook calls `pnpm run <script>`, so `package.json` is the single source
+  of both the tool versions and their flags.
 - **`exports` and `entry` move together.** The `exports` map in
   `package.json` is hand-written and `tsdown.config.ts`'s `entry` is the
   list of files it points to; add or remove a subpath in both, and publint
@@ -283,10 +283,14 @@ into the build (restored on exit, never committed).
 | `release-check` | `scripts/release-check.sh`, in the devcontainer |
 | `finalize` | nothing to combine |
 
-`build` and `publish` run through `scripts/release-run.sh`: on the host when
-it has pnpm (the devcontainer), else in the `node:<NODE_VERSION>` image (the
-bare runner `release.yml` uses, which has docker only). Every npm call uses
-the exact npm pinned in `scripts/release-lib.sh` (`npx npm@<version>`),
+`build`, `publish` and the SBOM's Node work run through
+`scripts/release-run.sh`: on the host when it has pnpm (the devcontainer),
+else in the `node:<NODE_VERSION>` image (the bare runner `release.yml` uses,
+which has docker only; only Syft runs on the host). Corepack ships with Node
+only up to 24.x, so the hook `scripts/develop.d/10-corepack.sh` and the image
+fallback install the pinned `corepack` from npm when it is missing. Each
+script resolves the exact npm pinned in `scripts/release-lib.sh` once (the
+host's npm if it is already that version, else installed into a temp prefix),
 since staged publishing needs npm 11.15.0 or later and OIDC trusted
 publishing 11.5.1 or later, and the Node in the devcontainer may ship an
 older one.
@@ -311,9 +315,13 @@ npmjs.com). Afterwards configure the package's trusted publisher on
 npmjs.com (repository, workflow `release.yml`), delete the `NPM_TOKEN`
 secret, and later releases take the OIDC path. npm expires a trusted
 publisher that has not published within 48 hours of being configured.
-Prereleases (`1.2.3-rc.1`) are published under their identifier as the
-dist-tag (`rc`), never `latest`, since npm refuses a prerelease without an
-explicit tag.
+The dist-tag is chosen by `dist_tag` in `scripts/release-lib.sh`: a
+prerelease (`1.2.3-rc.1`) gets its first identifier (`rc`), or `next` when
+that is numeric (`1.2.3-0`), never `latest` (npm refuses a prerelease without
+an explicit tag); build metadata (`+build.5`) is ignored. A stable release
+gets `latest` only if it is not older than the registry's current `latest`
+(none yet means first release); a backport such as 1.4.3 published after
+2.0.0 gets `v1-latest` instead, so `latest` never moves backwards.
 
 `NODE_AUTH_TOKEN` must stay unset everywhere (even empty): npm's OIDC
 trusted publishing breaks if it is present. `publish` unsets it
@@ -325,7 +333,9 @@ installed version. When `NPM_PUBLISH` is set it then looks the version up
 with `npm view`: if found it is installed from the registry and imported
 too; if not, it prints a "not yet on the registry (staged, awaiting
 approval?)" notice and passes, because a staged release is not installable
-until approved. Any other lookup failure (network, auth) fails the check.
+until approved. "Not found" is both an E404 and `npm view` exiting 0 with
+empty output (the package exists, that version does not). Any other lookup
+failure (network, auth) fails the check.
 The template itself never publishes (`NPM_PUBLISH` unset) but its release
 must pass the tarball check.
 

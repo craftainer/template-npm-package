@@ -32,8 +32,9 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run --coverage",
-    "publint": "publint",
-    "attw": "attw --pack . --profile esm-only"
+    "publint": "publint --strict",
+    "attw": "attw --pack . --profile esm-only",
+    "lockfile": "pnpm install --frozen-lockfile --lockfile-only"
   },
   "devDependencies": {
     "@arethetypeswrong/cli": "0.18.5",

@@ -13,15 +13,17 @@
   pins the npm and Syft versions; `release-run.sh` runs a script on the
   host, or in the pinned Node image when the host has no pnpm;
   `release-build.sh` stamps the version, builds and packs into `dist/`;
-  `release-sbom.sh` (+ `release-sbom-install.sh`) writes the SPDX SBOM;
+  `release-sbom.sh` (+ `release-sbom-install.sh`, `release-field.sh`) writes the SPDX SBOM;
   `release-publish.sh` skips, stages with the bootstrap token
-  (`npm stage publish`) or publishes through OIDC; `release-check.sh`
+  (`npm stage publish`) or publishes through OIDC, under a dist-tag from
+  `dist_tag` (prerelease id or `next`; `v<major>-latest` for a backport); `release-check.sh`
   installs the `dist/` tarball into a scratch project and imports every
   `exports` entry, then, if `NPM_PUBLISH` is set, does the same from the
   registry (a version not there yet, e.g. staged and unapproved, is a
   notice, not a failure).
 - `develop.d/`, `post-create.d/` — instance hook directories. This template
-  ships `develop.d/10-corepack.sh` (enables pnpm) and
+  ships `develop.d/10-corepack.sh` (enables pnpm, installing a pinned
+  Corepack when Node lacks one) and
   `post-create.d/10-pnpm-install.sh` (installs dependencies); a package adds
   its own scripts after them.
 

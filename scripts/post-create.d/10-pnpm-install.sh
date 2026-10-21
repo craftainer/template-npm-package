@@ -4,4 +4,6 @@
 set -euo pipefail
 
 cd /workspace
+# No one to answer Corepack's download prompt here.
+export COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 pnpm install --frozen-lockfile

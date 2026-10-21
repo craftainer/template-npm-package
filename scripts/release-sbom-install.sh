@@ -11,6 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 # shellcheck source=scripts/release-lib.sh
 source scripts/release-lib.sh
+use_npm
 
 tarball=$PWD/$1
 echo '{"private":true}' >"$2/package.json"

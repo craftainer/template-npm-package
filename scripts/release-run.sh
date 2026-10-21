@@ -15,6 +15,7 @@ fi
 
 # Same Node as the devcontainer; its Dockerfile is the single source.
 node_version=$(sed -n 's/^ARG NODE_VERSION=//p' .devcontainer/Dockerfile)
+corepack_version=$(sed -n 's/^COREPACK_VERSION=//p' scripts/develop.d/10-corepack.sh)
 env_args=()
 for name in RELEASE_VERSION RELEASE_TAG RELEASE_ARCH NPM_PUBLISH NPM_TOKEN \
     $(env | grep -E '^(GITHUB_|RUNNER_|ACTIONS_)' | cut -d= -f1); do
@@ -22,6 +23,10 @@ for name in RELEASE_VERSION RELEASE_TAG RELEASE_ARCH NPM_PUBLISH NPM_TOKEN \
 done
 
 exec docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" -w /src \
-    -e HOME=/tmp/home -e COREPACK_HOME=/tmp/corepack "${env_args[@]}" \
+    -e HOME=/tmp/home -e COREPACK_HOME=/tmp/corepack \
+    -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -e "COREPACK_VERSION=$corepack_version" "${env_args[@]}" \
     "node:${node_version}-trixie-slim" bash -c \
-    'mkdir -p /tmp/bin /tmp/home && corepack enable --install-directory /tmp/bin && PATH=/tmp/bin:$PATH exec "$@"' -- "$@"
+    'mkdir -p /tmp/bin /tmp/home /tmp/cp && PATH=/tmp/bin:$PATH
+     # Node 25+ images have no Corepack; install the pinned one from npm.
+     command -v corepack >/dev/null || { npm install --prefix /tmp/cp --no-audit --no-fund --silent "corepack@$COREPACK_VERSION" && PATH=/tmp/cp/node_modules/.bin:$PATH; }
+     corepack enable --install-directory /tmp/bin && exec "$@"' -- "$@"

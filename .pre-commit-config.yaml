@@ -26,8 +26,8 @@ repos:
         # pnpm 12's own package-manager self-management (see package.json's
         # `packageManager` field) writes pnpm-lock.yaml as two concatenated
         # YAML documents (its own platform-binary packages, then the actual
-        # project lockfile) -- valid pnpm, not valid single-document YAML.
-        exclude: ^pnpm-lock\.yaml$
+        # project lockfile).
+        args: [--allow-multiple-documents]
       - id: check-toml
         stages: [pre-commit, manual]
       - id: check-json
@@ -56,16 +56,17 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
-  # Every tool below is a project dev-dependency (see package.json) -- running
-  # them via `pnpm` keeps their pinned versions as the single source of truth
-  # instead of a second, separate pin per tool in this file. The build, publint
+  # Every tool below is a project dev-dependency, run through its package.json
+  # script (`pnpm run <script>`): package.json is the single source of both the
+  # pinned versions and the exact flags, so a hook can't drift from
+  # `pnpm run <script>` run by hand. The build, publint
   # and attw hooks run in this order (prek runs hooks sequentially) because the
   # last two inspect the built `dist/`.
   - repo: local
     hooks:
       - id: oxlint
         name: oxlint
-        entry: pnpm exec oxlint
+        entry: pnpm run lint
         language: system
         pass_filenames: false
         always_run: true
@@ -73,7 +74,7 @@ repos:
 
       - id: prettier-check
         name: prettier --check
-        entry: pnpm exec prettier --check .
+        entry: pnpm run format
         language: system
         pass_filenames: false
         always_run: true
@@ -81,7 +82,7 @@ repos:
 
       - id: typecheck
         name: tsc --noEmit
-        entry: pnpm exec tsc --noEmit
+        entry: pnpm run typecheck
         language: system
         pass_filenames: false
         always_run: true
@@ -89,7 +90,7 @@ repos:
 
       - id: vitest
         name: vitest (100% coverage gate)
-        entry: pnpm exec vitest run --coverage
+        entry: pnpm run test
         language: system
         pass_filenames: false
         always_run: true
@@ -97,7 +98,7 @@ repos:
 
       - id: build
         name: tsdown build
-        entry: pnpm exec tsdown
+        entry: pnpm run build
         language: system
         pass_filenames: false
         always_run: true
@@ -105,7 +106,7 @@ repos:
 
       - id: publint
         name: publint (package.json against dist/)
-        entry: pnpm exec publint --strict
+        entry: pnpm run publint
         language: system
         pass_filenames: false
         always_run: true
@@ -113,7 +114,7 @@ repos:
 
       - id: attw
         name: arethetypeswrong (esm-only profile)
-        entry: pnpm exec attw --pack . --profile esm-only
+        entry: pnpm run attw
         language: system
         pass_filenames: false
         always_run: true
@@ -121,7 +122,7 @@ repos:
 
       - id: lockfile-check
         name: pnpm-lock.yaml matches package.json
-        entry: pnpm install --frozen-lockfile --lockfile-only
+        entry: pnpm run lockfile
         language: system
         pass_filenames: false
         always_run: true
