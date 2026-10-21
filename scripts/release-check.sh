@@ -15,9 +15,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 # shellcheck source=scripts/release-lib.sh
 source scripts/release-lib.sh
+use_npm
 
 tmp=$(mktemp -d)
-trap 'rm -rf "$tmp"' EXIT
+on_exit "rm -rf '$tmp'"
 
 tarball=$(find_tarball)
 name=$(tarball_field "$tarball" name)
@@ -31,8 +32,19 @@ check_import() {
         const [name, want] = process.argv.slice(1);
         const pkg = JSON.parse(readFileSync(`node_modules/${name}/package.json`, "utf8"));
         if (pkg.version !== want) throw new Error(`installed ${name} ${pkg.version}, expected ${want}`);
-        for (const key of Object.keys(pkg.exports)) {
-            if (key.endsWith(".json")) continue;
+        // exports may be missing, a string, an array, a conditions object
+        // (no "."-prefixed keys) or a subpath map; only the last has several
+        // entries. Without a subpath map the entry is the bare package name.
+        const exp = pkg.exports;
+        const isMap = exp && typeof exp === "object" && !Array.isArray(exp)
+            && Object.keys(exp).some((k) => k.startsWith("."));
+        const keys = isMap ? Object.keys(exp) : ["."];
+        for (const key of keys) {
+            if (key.endsWith(".json") || (isMap && exp[key] === null)) continue;
+            if (key.includes("*")) {
+                console.log(`NOTICE: skipping wildcard export ${key}`);
+                continue;
+            }
             const spec = name + key.slice(1);
             const mod = await import(spec);
             console.log(`OK: import ${spec} (${Object.keys(mod).length} exports)`);
@@ -42,7 +54,7 @@ check_import() {
 
 install_into() { # <dir> <package spec>
     echo '{"private":true,"type":"module"}' >"$1/package.json"
-    (cd "$1" && npm install --no-audit --no-fund --silent "$2")
+    (cd "$1" && npm install --ignore-scripts --no-audit --no-fund --silent "$2")
 }
 
 echo "== local tarball: $(basename "$tarball")"
@@ -59,15 +71,19 @@ echo "== registry: $name@$version"
 attempts=${RELEASE_CHECK_ATTEMPTS:-3}
 delay=${RELEASE_CHECK_DELAY:-5}
 for ((i = 1; i <= attempts; i++)); do
-    if err=$(npm view "$name@$version" version 2>&1 >/dev/null); then
-        mkdir "$tmp/published"
-        install_into "$tmp/published" "$name@$version"
-        check_import "$tmp/published" "$version"
-        exit 0
-    fi
+    # `npm view name@version version` exits 0 with empty output when the
+    # package exists but that version does not (still propagating, or staged
+    # and unapproved), and exits 1 with E404 when the package is unknown.
+    if found=$(npm view "$name@$version" version 2>"$tmp/err"); then
+        if [[ -n $found ]]; then
+            mkdir "$tmp/published"
+            install_into "$tmp/published" "$name@$version"
+            check_import "$tmp/published" "$version"
+            exit 0
+        fi
     # Anything but "not found" (network, auth) is a real failure.
-    if ! grep -q E404 <<<"$err"; then
-        echo "$err" >&2
+    elif ! grep -q E404 "$tmp/err"; then
+        cat "$tmp/err" >&2
         exit 1
     fi
     if ((i < attempts)); then

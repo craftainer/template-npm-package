@@ -12,17 +12,18 @@ source scripts/release-lib.sh
 tmp=$(mktemp -d)
 bak=$tmp/package.json
 cp package.json "$bak"
-trap 'cp "$bak" package.json; rm -rf "$tmp"' EXIT
+on_exit 'cp "$bak" package.json; rm -rf "$tmp"'
+use_npm
 
 pnpm install --frozen-lockfile
 if [[ -n ${RELEASE_VERSION:-} ]]; then
     npm pkg set "version=$RELEASE_VERSION"
 fi
-rm -rf dist
 pnpm build
 # --ignore-scripts: the tarball is exactly the built `files`, nothing a
 # lifecycle script adds. Packed outside dist/, which build output fills.
 npm pack --ignore-scripts --pack-destination "$tmp" >/dev/null
+# tsdown's output must not stay: dist/ is what release.yml attaches.
 rm -rf dist
 mkdir dist
 mv "$tmp"/*.tgz dist/

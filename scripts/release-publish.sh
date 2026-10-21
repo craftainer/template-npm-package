@@ -9,12 +9,15 @@
 #     maintainer approves the printed stage id with 2FA.
 #   - NPM_TOKEN empty: `npm publish --provenance` through OIDC trusted
 #     publishing (the job's `id-token: write`), no stored credential.
-# `npm_config_dry_run=true` makes either path a dry run.
+# The dist-tag is `latest` unless the version is a prerelease (its first
+# non-numeric identifier, else `next`) or older than the current `latest`
+# (`v<major>-latest`). `npm_config_dry_run=true` makes either path a dry run.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 # shellcheck source=scripts/release-lib.sh
 source scripts/release-lib.sh
+use_npm
 
 # npm's OIDC trusted publishing breaks if this is set, even empty.
 unset NODE_AUTH_TOKEN
@@ -25,18 +28,17 @@ if [[ -z ${NPM_PUBLISH:-} ]]; then
 fi
 
 tarball=$(find_tarball)
+name=$(tarball_field "$tarball" name)
 version=$(tarball_field "$tarball" version)
-# npm refuses a prerelease without an explicit tag, and must not move `latest`.
-tag=latest
-if [[ $version == *-* ]]; then
-    prerelease=${version#*-}
-    tag=${prerelease%%.*}
-fi
+# npm refuses a prerelease without an explicit tag, and a backport must not
+# move `latest` backwards: see dist_tag.
+tag=$(dist_tag "$name" "$version")
+echo "Publishing $name@$version under dist-tag '$tag'."
 
 if [[ -n ${NPM_TOKEN:-} ]]; then
     echo "NPM_TOKEN set -- staging $(basename "$tarball") with the bootstrap token."
     npmrc=$(mktemp)
-    trap 'rm -f "$npmrc"' EXIT
+    on_exit "rm -f '$npmrc'"
     chmod 600 "$npmrc"
     printf '//registry.npmjs.org/:_authToken=%s\n' "$NPM_TOKEN" >"$npmrc"
     # --userconfig replaces the user npmrc, so the token reaches npm through a
