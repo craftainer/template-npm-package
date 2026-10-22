@@ -135,7 +135,8 @@ unchanged across every instance), then drives these targets:
 | Target | Runs | Where | Env available |
 |---|---|---|---|
 | `release-arches` | once, first | host runner | none; must print a JSON array on stdout, e.g. `["amd64"]` |
-| `build`, `sbom`, `release-assets`, `publish` | once **per arch**, in that order | host runner for that arch | `RELEASE_VERSION`, `RELEASE_TAG`, `RELEASE_ARCH`, `OCI_REGISTRY`, `OCI_IMAGE_NAME`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_PASSWORD`, `PYPI_PUBLISH`, `NPM_PUBLISH`, `CARGO_PUBLISH`, all `GITHUB_*`; on `publish` only, `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` (bootstrap secrets; empty when unset, so treat empty as absent) |
+| `build`, `sbom`, `release-assets`, `publish` | once **per arch**, in that order | host runner for that arch | `RELEASE_VERSION`, `RELEASE_TAG`, `RELEASE_ARCH`, `OCI_REGISTRY`, `OCI_IMAGE_NAME`, `OCI_REGISTRY_USERNAME`, `OCI_REGISTRY_PASSWORD`, all `GITHUB_*`; no package-registry variables or secrets, and no OIDC token |
+| `publish-packages` | once, after all arches, **only if** `PYPI_PUBLISH`, `NPM_PUBLISH` or `CARGO_PUBLISH` is set | host runner (own job, with `id-token: write`) | `RELEASE_VERSION`, `RELEASE_TAG`, `PYPI_PUBLISH`, `NPM_PUBLISH`, `CARGO_PUBLISH`, all `GITHUB_*`, the OIDC token, `NPM_TOKEN` and `CARGO_REGISTRY_TOKEN` (bootstrap secrets; empty when unset, so treat empty as absent); `dist/` holds every arch leg's files |
 | `release-check` | once, after all arches | **inside the devcontainer** (`devcontainers/ci`), stack up | `RELEASE_VERSION`, `RELEASE_TAG`, `PYPI_PUBLISH`, `NPM_PUBLISH`, `CARGO_PUBLISH` |
 | `finalize` | once, after `release-check` | host runner | same as per-arch minus `RELEASE_ARCH` |
 
@@ -143,14 +144,32 @@ What each target is for: `build` produces the release artifact(s) (an
 image, `cargo build --release`, `npm pack`, `helm package`, ...); `sbom`
 writes an SBOM for what `build` produced; `release-assets` populates
 `dist/` (gitignored) with every file to attach to the GitHub release;
-`publish` pushes to whatever registry applies, skipping cleanly when its
-variable/secret isn't set; `release-check` runs checks that need the
+`publish` pushes the per-arch image to its registry, skipping cleanly when
+`OCI_REGISTRY` isn't set; `publish-packages` uploads packages (PyPI, npm,
+crates.io) once per release, never once per arch, and runs in a job that
+exists only for instances that set one of the `*_PUBLISH` variables, so
+an image-only instance never has `id-token: write` or a package secret
+(base's default fails if any `*_PUBLISH` variable is set, so an instance
+can't silently skip it; with none set it is a no-op; it runs on a fresh runner with a checkout and the
+downloaded `dist/` only, so it uploads from `dist/` and sets up its own
+tooling); `release-check` runs checks that need the
 backing services (e.g. tests producing a coverage report); `finalize`
 does cross-arch work such as combining per-arch registry tags into one
 multi-arch manifest list. `RELEASE_VERSION` (e.g. `1.2.3` or
 `1.2.3-alpha.1`) and `RELEASE_TAG` (the same, `v`-prefixed) are for
 embedding or tagging with the version. A single-arch no-op is the
 default: `release-arches` prints `["amd64"]`.
+
+**Upgrading a package instance.** Before this contract, `publish` also
+uploaded packages, once per arch. Now `publish` is image-only and gets no
+`*_PUBLISH` variables, secrets or OIDC token. An instance that publishes
+packages must move that upload from `publish` into a new
+`publish-packages` target (reading artifacts from `dist/`, setting up its
+own tooling). Until it does, base's default `publish-packages` (if the
+instance kept it) fails with a message naming the variable that is set;
+an instance whose Makefile has no such target fails with `make: No rule
+to make target`. Either way the release stops instead of skipping the
+upload.
 
 `dist/` rules: each arch leg's `dist/` is uploaded as artifact
 `release-assets-<arch>`, and the final job downloads all of them into one
@@ -241,16 +260,16 @@ records why.
   instance-owned, a package must also point `repository.url`
   (`git+https://github.com/<owner>/<repo>.git`), `homepage` and `bugs.url`
   at its own repository: the template ships its own values, which a copy
-  inherits, and `make publish` fails on a `repository.url` that is not
+  inherits, and `make publish-packages` fails on a `repository.url` that is not
   `https://github.com/$GITHUB_REPOSITORY`.
 - **Instance setup checklist (npm).** Before the first release: (1) rename
   `name`, and set `repository`, `homepage` and `bugs` in `package.json` as
   above; (2) set the `NPM_PUBLISH` repository variable (any non-empty
-  value) — unset, `make publish` only prints a `::warning::` that nothing
+  value) — unset, `make publish-packages` only prints a `::warning::` that nothing
   was published; (3) for the stage-only bootstrap, add the `NPM_TOKEN`
   secret (organization or repository; a granular token, "Read and write
   (stage only)"), run the release, approve the stage, configure the trusted
-  publisher on npmjs.com and delete `NPM_TOKEN` (see `publish` below).
+  publisher on npmjs.com and delete `NPM_TOKEN` (see `publish-packages` below).
 - **Template-owned tooling (`replace` tier).** `scripts/release-*.sh` (the
   release logic below), `scripts/develop.d/10-corepack.sh` (enables pnpm
   through Corepack, which reads `packageManager`) and
@@ -292,14 +311,21 @@ into the build (restored on exit, never committed).
 | `build` | `pnpm install --frozen-lockfile`, stamp the version, `pnpm build`, `npm pack`; leaves only `<name>-<version>.tgz` in `dist/` (which `release.yml` attaches to the GitHub release, so tsdown's output must not stay there) |
 | `sbom` | installs the tarball (production dependencies, no scripts) into a scratch project and scans it with Syft (`dir:`, `-o spdx-json`) into `dist/<name>-<version>.spdx.json` |
 | `release-assets` | checks the tarball and SBOM are in `dist/` |
-| `publish` | see below; publishes the tarball from `dist/`, so the artifact is exactly what was SBOM'd |
+| `publish` | no-op: it is image-only and runs per arch, and this template ships no image |
+| `publish-packages` | see below; runs once, publishes the tarball from `dist/`, so the artifact is exactly what was SBOM'd |
 | `release-check` | `scripts/release-check.sh`, in the devcontainer |
 | `finalize` | nothing to combine |
 
-`build`, `publish` and the SBOM's Node work run through
+`build`, `publish-packages` and the SBOM's Node work run through
 `scripts/release-run.sh`: on the host when it has pnpm (the devcontainer),
-else in the `node:<NODE_VERSION>` image (the bare runner `release.yml` uses,
-which has docker only; only Syft runs on the host). Corepack ships with Node
+else in the `node:<NODE_VERSION>` image (the bare runners `release.yml` uses,
+which have docker only; only Syft runs on the host). That is how
+`publish-packages` sets up Node on its bare runner: `release.yml` gives that
+job a checkout and the downloaded `dist/` and no `setup-node`, so nothing
+is installed on the runner itself; the pinned image supplies Node, and
+`release-lib.sh`'s `use_npm` the exact npm. pnpm is not needed to upload a
+tarball, so it is never invoked there. The image gets the OIDC variables
+(`ACTIONS_ID_TOKEN_REQUEST_*`) and `NPM_TOKEN`, never `NODE_AUTH_TOKEN`. Corepack ships with Node
 only up to 24.x, so the hook `scripts/develop.d/10-corepack.sh` and the image
 fallback install the pinned `corepack` from npm when it is missing. Each
 script resolves the exact npm pinned in `scripts/release-lib.sh` once (the
@@ -308,20 +334,26 @@ since staged publishing needs npm 11.15.0 or later and OIDC trusted
 publishing 11.5.1 or later, and the Node in the devcontainer may ship an
 older one.
 
-**`publish`** reads `NPM_PUBLISH` (a repository variable) and `NPM_TOKEN` (a
-secret that `release.yml` passes to `make publish` only; empty means absent).
+**`publish-packages`** reads `NPM_PUBLISH` (a repository variable) and
+`NPM_TOKEN` (a secret that `release.yml` passes to that one step; empty means
+absent). `release.yml` starts its job only when `NPM_PUBLISH` (or another
+`*_PUBLISH` variable) is set, so the `skips` row below applies to a local or
+manual run; in CI an unset variable means the whole job is skipped. The job
+runs once, not per arch, and holds `id-token: write`; the per-arch `build`
+job has neither that nor the token.
 Before any stage or publish it checks, with `check_repository` in
 `scripts/release-lib.sh`, that the tarball's `repository.url` (`git+` prefix,
 `.git` suffix and trailing slash stripped, case-sensitive) equals
 `https://github.com/$GITHUB_REPOSITORY`, because npm's provenance
 verification rejects any other value (E422); it is skipped with a notice
 when `GITHUB_REPOSITORY` is unset (a local run), and it only runs when
-`NPM_PUBLISH` is set:
+`NPM_PUBLISH` is set. `npm_config_dry_run=true` turns either path into a
+dry run (nothing is uploaded):
 
 | `NPM_PUBLISH` | `NPM_TOKEN` | Does |
 |---|---|---|
 | empty | any | skips, with a `::warning::` saying the package was NOT published |
-| set | empty | `npm publish --provenance --access public` through OIDC trusted publishing (the build job's `id-token: write`); no stored credential |
+| set | empty | `npm publish --provenance --access public` through OIDC trusted publishing (the `publish-packages` job's `id-token: write`); no stored credential |
 | set | set | bootstrap: `npm stage publish` with the token, passed in a temporary `--userconfig` npmrc that is deleted afterwards; prints how to approve |
 
 A package has no trusted publisher before its first release, and npm has no
@@ -343,8 +375,18 @@ gets `latest` only if it is not older than the registry's current `latest`
 (none yet means first release); a backport such as 1.4.3 published after
 2.0.0 gets `v1-latest` instead, so `latest` never moves backwards.
 
+**Syncing an existing package instance** (from a template older than 1.2.0,
+which uploaded from `publish` and so needed base 1.9.0's contract). Sync
+brings in base 1.9.0's `release.yml` (replace tier), whose `build` job no
+longer has `id-token: write` or `NPM_TOKEN`; so the instance's Makefile must
+rename `publish` to `publish-packages` (`scripts/release-run.sh
+scripts/release-publish.sh`), add it to `.PHONY`, and make `publish` a
+no-op. `scripts/release-*.sh` are replace tier, so the scripts come with the
+sync; the `Makefile` is instance-owned and does not. Until then the release
+fails loudly at `publish-packages` when `NPM_PUBLISH` is set.
+
 `NODE_AUTH_TOKEN` must stay unset everywhere (even empty): npm's OIDC
-trusted publishing breaks if it is present. `publish` unsets it
+trusted publishing breaks if it is present. `publish-packages` unsets it
 defensively; never map `NPM_TOKEN` to it in a workflow.
 
 **`release-check`** always installs the `dist/` tarball into a scratch

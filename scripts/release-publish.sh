@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# `make publish`: publish the tarball in dist/ to npm -- the exact file that
-# was SBOM'd -- by one of two paths.
+# `make publish-packages`: publish the tarball in dist/ to npm -- the exact
+# file that was SBOM'd, never rebuilt -- by one of two paths. release.yml runs
+# it once, in a job with a checkout and the downloaded dist/ only.
 #
 # Reads: NPM_PUBLISH (empty = skip, with a ::warning::), NPM_TOKEN (empty =
 # absent), GITHUB_REPOSITORY (package.json's repository.url must match it).

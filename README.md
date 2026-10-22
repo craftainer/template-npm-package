@@ -25,7 +25,7 @@ for why it exists.
    `tests/`, and the `exports` map together with `tsdown.config.ts`'s
    `entry`. Point `repository.url` (`git+https://github.com/<owner>/<repo>.git`),
    `homepage` and `bugs.url` at the new repository: `package.json` is
-   instance-owned, and `make publish` refuses a mismatch (npm rejects
+   instance-owned, and `make publish-packages` refuses a mismatch (npm rejects
    provenance otherwise). Then run `pnpm install` to refresh `pnpm-lock.yaml`.
 3. Point template sync at this template. `.github/template-sync-state.json`
    here records the `template-base` tag this template itself last synced
@@ -51,7 +51,7 @@ for why it exists.
 
 ## Publishing to npm
 
-`make publish` is a no-op (with a `::warning::` in the log) until you opt
+`make publish-packages` is a no-op (with a `::warning::` in the log) until you opt
 in by setting the repository variable `NPM_PUBLISH` (any non-empty value). npm has no pending publishers,
 so the first release is bootstrapped with a token and every later one uses
 [trusted publishing](https://docs.npmjs.com/trusted-publishers) (GitHub
@@ -59,7 +59,7 @@ OIDC, with provenance), with no token stored:
 
 1. Create the `NPM_TOKEN` secret: a granular token for the `@craftainer`
    scope with "Read and write (stage only)". Set `NPM_PUBLISH`.
-2. Run the first release. `make publish` runs `npm stage publish`, which
+2. Run the first release. `make publish-packages` runs `npm stage publish`, which
    stages the tarball without 2FA. Approve it with 2FA: `npm stage list`,
    then `npm stage approve <stage-id>` (or on npmjs.com). Until then the
    version is not installable, and `make release-check` says so and passes.
