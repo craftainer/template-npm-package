@@ -237,7 +237,20 @@ records why.
   `@craftainer/<name>` (npm's org-scope convention; the template's own
   unscoped name is a placeholder), owns its dependencies, entry points, code
   and tests, and regenerates the lockfile with `pnpm install`. Tool
-  *versions* are kept fresh by Renovate, not by sync.
+  *versions* are kept fresh by Renovate, not by sync. Because it is
+  instance-owned, a package must also point `repository.url`
+  (`git+https://github.com/<owner>/<repo>.git`), `homepage` and `bugs.url`
+  at its own repository: the template ships its own values, which a copy
+  inherits, and `make publish` fails on a `repository.url` that is not
+  `https://github.com/$GITHUB_REPOSITORY`.
+- **Instance setup checklist (npm).** Before the first release: (1) rename
+  `name`, and set `repository`, `homepage` and `bugs` in `package.json` as
+  above; (2) set the `NPM_PUBLISH` repository variable (any non-empty
+  value) — unset, `make publish` only prints a `::warning::` that nothing
+  was published; (3) for the stage-only bootstrap, add the `NPM_TOKEN`
+  secret (organization or repository; a granular token, "Read and write
+  (stage only)"), run the release, approve the stage, configure the trusted
+  publisher on npmjs.com and delete `NPM_TOKEN` (see `publish` below).
 - **Template-owned tooling (`replace` tier).** `scripts/release-*.sh` (the
   release logic below), `scripts/develop.d/10-corepack.sh` (enables pnpm
   through Corepack, which reads `packageManager`) and
@@ -296,11 +309,18 @@ publishing 11.5.1 or later, and the Node in the devcontainer may ship an
 older one.
 
 **`publish`** reads `NPM_PUBLISH` (a repository variable) and `NPM_TOKEN` (a
-secret that `release.yml` passes to `make publish` only; empty means absent):
+secret that `release.yml` passes to `make publish` only; empty means absent).
+Before any stage or publish it checks, with `check_repository` in
+`scripts/release-lib.sh`, that the tarball's `repository.url` (`git+` prefix,
+`.git` suffix and trailing slash stripped, case-sensitive) equals
+`https://github.com/$GITHUB_REPOSITORY`, because npm's provenance
+verification rejects any other value (E422); it is skipped with a notice
+when `GITHUB_REPOSITORY` is unset (a local run), and it only runs when
+`NPM_PUBLISH` is set:
 
 | `NPM_PUBLISH` | `NPM_TOKEN` | Does |
 |---|---|---|
-| empty | any | skips |
+| empty | any | skips, with a `::warning::` saying the package was NOT published |
 | set | empty | `npm publish --provenance --access public` through OIDC trusted publishing (the build job's `id-token: write`); no stored credential |
 | set | set | bootstrap: `npm stage publish` with the token, passed in a temporary `--userconfig` npmrc that is deleted afterwards; prints how to approve |
 
