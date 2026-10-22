@@ -110,7 +110,8 @@ normalize_repo_url() {
 # (object or string form) is https://github.com/$GITHUB_REPOSITORY. npm's
 # provenance verification rejects the upload otherwise (E422), and an
 # instance created from the template inherits the template's own value until
-# it edits package.json. Skipped with a notice when GITHUB_REPOSITORY is
+# it edits package.json. Called by release-publish.sh only once publishing is
+# on. Skipped with a notice when GITHUB_REPOSITORY is
 # unset, i.e. outside GitHub Actions.
 check_repository() {
     if [[ -z ${GITHUB_REPOSITORY:-} ]]; then

@@ -315,8 +315,8 @@ Before any stage or publish it checks, with `check_repository` in
 `.git` suffix and trailing slash stripped, case-sensitive) equals
 `https://github.com/$GITHUB_REPOSITORY`, because npm's provenance
 verification rejects any other value (E422); it is skipped with a notice
-when `GITHUB_REPOSITORY` is unset (a local run), and `release-check` runs
-the same check:
+when `GITHUB_REPOSITORY` is unset (a local run), and it only runs when
+`NPM_PUBLISH` is set:
 
 | `NPM_PUBLISH` | `NPM_TOKEN` | Does |
 |---|---|---|

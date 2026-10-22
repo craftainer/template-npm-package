@@ -3,8 +3,7 @@
 # import every `exports` entry; when publishing is on, do the same with the
 # published release from the registry.
 #
-# Reads: GITHUB_REPOSITORY (when set, package.json's repository.url must match
-# it; see check_repository), NPM_PUBLISH (empty = skip the registry check), and
+# Reads: NPM_PUBLISH (empty = skip the registry check), and
 # RELEASE_CHECK_ATTEMPTS / RELEASE_CHECK_DELAY (retry tuning for registry
 # propagation, defaults 3 and 5 seconds, doubling).
 #
@@ -57,8 +56,6 @@ install_into() { # <dir> <package spec>
     echo '{"private":true,"type":"module"}' >"$1/package.json"
     (cd "$1" && npm install --ignore-scripts --no-audit --no-fund --silent "$2")
 }
-
-check_repository "$tarball"
 
 echo "== local tarball: $(basename "$tarball")"
 mkdir "$tmp/local"
