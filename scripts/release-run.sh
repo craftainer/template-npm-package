@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Runs the given command on the host if it has pnpm, else in the pinned Node
-# image (release.yml's bare runner has docker but no pnpm).
+# image (release.yml's bare runners -- the build leg and the publish-packages
+# job -- have docker but no pnpm).
 #
 # The container sees the working tree at /src and the CI variables npm needs
 # for OIDC trusted publishing and provenance. NODE_AUTH_TOKEN is deliberately
