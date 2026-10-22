@@ -2,7 +2,8 @@
 # `make publish`: publish the tarball in dist/ to npm -- the exact file that
 # was SBOM'd -- by one of two paths.
 #
-# Reads: NPM_PUBLISH (empty = skip), NPM_TOKEN (empty = absent).
+# Reads: NPM_PUBLISH (empty = skip, with a ::warning::), NPM_TOKEN (empty =
+# absent), GITHUB_REPOSITORY (package.json's repository.url must match it).
 #   - NPM_TOKEN set (bootstrap: the first release, before the package has a
 #     trusted publisher): `npm stage publish`. The token is stage-only, so
 #     this uploads the tarball to a staging area; nothing is public until a
@@ -23,11 +24,13 @@ use_npm
 unset NODE_AUTH_TOKEN
 
 if [[ -z ${NPM_PUBLISH:-} ]]; then
-    echo "NPM_PUBLISH not set -- skipping publish."
+    echo "::warning title=npm publish skipped::NPM_PUBLISH is not set, so this package was NOT published to npm. To enable it, set the NPM_PUBLISH repository variable (any non-empty value; Settings > Secrets and variables > Actions > Variables) and re-run the release."
     exit 0
 fi
 
 tarball=$(find_tarball)
+# Before any stage or publish: a mismatch would only fail later, at npm.
+check_repository "$tarball"
 name=$(tarball_field "$tarball" name)
 version=$(tarball_field "$tarball" version)
 # npm refuses a prerelease without an explicit tag, and a backport must not

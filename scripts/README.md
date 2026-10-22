@@ -14,7 +14,9 @@
   host, or in the pinned Node image when the host has no pnpm;
   `release-build.sh` stamps the version, builds and packs into `dist/`;
   `release-sbom.sh` (+ `release-sbom-install.sh`, `release-field.sh`) writes the SPDX SBOM;
-  `release-publish.sh` skips, stages with the bootstrap token
+  `release-publish.sh` skips (with a `::warning::`), first checks
+  `repository.url` against `GITHUB_REPOSITORY` (`check_repository` in
+  `release-lib.sh`, also run by `release-check.sh`), stages with the bootstrap token
   (`npm stage publish`) or publishes through OIDC, under a dist-tag from
   `dist_tag` (prerelease id or `next`; `v<major>-latest` for a backport); `release-check.sh`
   installs the `dist/` tarball into a scratch project and imports every

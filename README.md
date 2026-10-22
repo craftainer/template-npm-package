@@ -23,7 +23,10 @@ for why it exists.
 2. Rename the package: `package.json`'s `name` to `@craftainer/<name>`, its
    description, and this file's title and description. Edit `src/`,
    `tests/`, and the `exports` map together with `tsdown.config.ts`'s
-   `entry`. Then run `pnpm install` to refresh `pnpm-lock.yaml`.
+   `entry`. Point `repository.url` (`git+https://github.com/<owner>/<repo>.git`),
+   `homepage` and `bugs.url` at the new repository: `package.json` is
+   instance-owned, and `make publish` refuses a mismatch (npm rejects
+   provenance otherwise). Then run `pnpm install` to refresh `pnpm-lock.yaml`.
 3. Point template sync at this template. `.github/template-sync-state.json`
    here records the `template-base` tag this template itself last synced
    from; the copy in a new package must instead name this repository and
@@ -48,8 +51,8 @@ for why it exists.
 
 ## Publishing to npm
 
-`make publish` is a no-op until you opt in by setting the repository
-variable `NPM_PUBLISH` (any non-empty value). npm has no pending publishers,
+`make publish` is a no-op (with a `::warning::` in the log) until you opt
+in by setting the repository variable `NPM_PUBLISH` (any non-empty value). npm has no pending publishers,
 so the first release is bootstrapped with a token and every later one uses
 [trusted publishing](https://docs.npmjs.com/trusted-publishers) (GitHub
 OIDC, with provenance), with no token stored:
