@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -18,6 +19,11 @@ describe("release Makefile contract", () => {
     expect(r.stdout).toContain(
       "scripts/release-run.sh scripts/release-publish.sh",
     );
+  });
+
+  it("declares publish-packages phony, so a stray file cannot shadow it", () => {
+    const makefile = readFileSync(resolve(root, "Makefile"), "utf8");
+    expect(makefile).toMatch(/^\.PHONY:.*\bpublish-packages\b/m);
   });
 
   it("publish (per arch) does not upload packages", () => {
