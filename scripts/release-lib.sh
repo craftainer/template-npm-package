@@ -130,3 +130,38 @@ check_repository() {
     fi
     echo "OK: package.json repository.url matches $want."
 }
+
+# Shared by release-check.sh (the local tarball) and release-verify-published.sh
+# (the published release).
+# <dir> <name> <expected version>: import `name` and every exports subpath (ESM,
+# Node) from the package installed in <dir>.
+check_import() {
+    (cd "$1" && node --input-type=module -e '
+        import { readFileSync } from "node:fs";
+        const [name, want] = process.argv.slice(1);
+        const pkg = JSON.parse(readFileSync(`node_modules/${name}/package.json`, "utf8"));
+        if (pkg.version !== want) throw new Error(`installed ${name} ${pkg.version}, expected ${want}`);
+        // exports may be missing, a string, an array, a conditions object
+        // (no "."-prefixed keys) or a subpath map; only the last has several
+        // entries. Without a subpath map the entry is the bare package name.
+        const exp = pkg.exports;
+        const isMap = exp && typeof exp === "object" && !Array.isArray(exp)
+            && Object.keys(exp).some((k) => k.startsWith("."));
+        const keys = isMap ? Object.keys(exp) : ["."];
+        for (const key of keys) {
+            if (key.endsWith(".json") || (isMap && exp[key] === null)) continue;
+            if (key.includes("*")) {
+                console.log(`NOTICE: skipping wildcard export ${key}`);
+                continue;
+            }
+            const spec = name + key.slice(1);
+            const mod = await import(spec);
+            console.log(`OK: import ${spec} (${Object.keys(mod).length} exports)`);
+        }
+    ' "$2" "$3")
+}
+
+install_into() { # <dir> <package spec>
+    echo '{"private":true,"type":"module"}' >"$1/package.json"
+    (cd "$1" && npm install --ignore-scripts --no-audit --no-fund --silent "$2")
+}

@@ -13,8 +13,8 @@ resolves correctly for ESM and TypeScript consumers) and a release path to
 npm. Copying that setup by hand would let the copies drift.
 `template-python-package` solved this for Python; the TypeScript packages
 should share one release contract with it: the version lives only in the git
-tag, `make build` stamps it, `release-check` installs the published artifact
-back.
+tag, `make build` stamps it, `verify-published` installs the published
+artifact back.
 
 Publishing needs credentials. A long-lived npm token stored as a secret is a
 standing risk; npm supports trusted publishing through GitHub's OIDC identity
@@ -51,11 +51,13 @@ it. It contains:
   and without it `npm publish --provenance` through OIDC trusted publishing.
   It publishes the packed tarball from `dist/`, uses an exact pinned npm
   (11.15.0 or later) through `npx`, and never sets `NODE_AUTH_TOKEN`;
-- a `release-check` that always installs the `dist/` tarball into a scratch
-  project and imports every `exports` entry, and when publishing is on also
-  installs the version from the registry. A version that is not on the
-  registry yet is a notice, not a failure, because a staged release is not
-  installable until it is approved;
+- a `release-check` that installs the `dist/` tarball into a scratch
+  project and imports every `exports` entry (it gates the release, so only
+  the local artifact), and a `verify-published` target that, after
+  `publish-packages` and when publishing is on, installs the version from the
+  registry the same way. A version that is not on the registry yet is a
+  notice, not a failure, because a staged release is not installable until
+  it is approved;
 - the GPL-3.0 license, matching the other templates, and a sync manifest
   that classifies the scaffold (`package.json`, `tsconfig*.json`,
   `tsdown.config.ts`, `vitest.config.ts`, `src/`, `tests/`,
@@ -82,7 +84,7 @@ and deletes the token, and later releases go through OIDC.
   source (`.devcontainer/Dockerfile`), but a package's `engines.node` has to
   be kept in step by hand.
 - A first release that is staged and not yet approved passes
-  `release-check` on the tarball alone; the registry install is verified
+  `verify-published` as a notice; the registry install is verified
   only on later releases or after approval, so a staged release that is
   never approved is not caught by the release.
 - `npm stage` is new and its CLI may still change; the scripts pin npm

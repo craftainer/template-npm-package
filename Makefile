@@ -9,7 +9,7 @@
 # is `publish-packages` (template-base >= 1.9.0: runs once, after every arch
 # leg, in its own job); the per-arch `publish` is image-only, so a no-op here.
 
-.PHONY: release-arches build sbom release-assets publish publish-packages release-check finalize
+.PHONY: release-arches build sbom release-assets publish publish-packages verify-published release-check finalize
 
 release-arches:
 	@echo '["amd64"]'
@@ -39,8 +39,17 @@ publish:
 publish-packages:
 	scripts/release-run.sh scripts/release-publish.sh
 
-# Runs once after the arch leg, inside the devcontainer; dist/ holds the
-# downloaded tarball. See scripts/release-check.sh.
+# Once, in release.yml's `verify-published` job, after `publish-packages`
+# succeeded and only when a *_PUBLISH variable is set: installs the published
+# version from the registry. A bare runner with no secrets, so like
+# `publish-packages` it goes through release-run.sh. See
+# scripts/release-verify-published.sh.
+verify-published:
+	scripts/release-run.sh scripts/release-verify-published.sh
+
+# Runs once after the arch leg, inside the devcontainer, and gates the GitHub
+# release and publishing; dist/ holds the downloaded tarball. Checks the local
+# tarball only. See scripts/release-check.sh.
 release-check:
 	scripts/release-check.sh
 

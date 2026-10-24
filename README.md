@@ -62,7 +62,8 @@ OIDC, with provenance), with no token stored:
 2. Run the first release. `make publish-packages` runs `npm stage publish`, which
    stages the tarball without 2FA. Approve it with 2FA: `npm stage list`,
    then `npm stage approve <stage-id>` (or on npmjs.com). Until then the
-   version is not installable, and `make release-check` says so and passes.
+   version is not installable, and `make verify-published` (the release
+   workflow's last job, after the GitHub release exists) says so and passes.
 3. On npmjs.com, add the package's trusted publisher (this repository,
    workflow `release.yml`), then delete the `NPM_TOKEN` secret. Later
    releases publish directly through OIDC; npm expires a trusted-publisher
