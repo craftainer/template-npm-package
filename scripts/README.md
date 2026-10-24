@@ -24,9 +24,12 @@
   (`npm stage publish`) or publishes through OIDC, under a dist-tag from
   `dist_tag` (prerelease id or `next`; `v<major>-latest` for a backport); `release-check.sh`
   installs the `dist/` tarball into a scratch project and imports every
-  `exports` entry, then, if `NPM_PUBLISH` is set, does the same from the
-  registry (a version not there yet, e.g. staged and unapproved, is a
-  notice, not a failure).
+  `exports` entry (it gates the GitHub release and publishing, so it checks
+  only the local artifact); `release-verify-published.sh`
+  (`make verify-published`, after `publish-packages`, only when a `*_PUBLISH`
+  variable is set) does the same from the registry if `NPM_PUBLISH` is set,
+  with no secrets (a version not there yet, e.g. staged and unapproved, is
+  a notice, not a failure).
 - `develop.d/`, `post-create.d/` — instance hook directories. This template
   ships `develop.d/10-corepack.sh` (enables pnpm, installing a pinned
   Corepack when Node lacks one) and
