@@ -133,7 +133,7 @@ check_repository() {
 
 # Shared by release-check.sh (the local tarball) and release-verify-published.sh
 # (the published release).
-# <dir> <expected version>: import `name` and every exports subpath (ESM,
+# <dir> <name> <expected version>: import `name` and every exports subpath (ESM,
 # Node) from the package installed in <dir>.
 check_import() {
     (cd "$1" && node --input-type=module -e '
@@ -158,7 +158,7 @@ check_import() {
             const mod = await import(spec);
             console.log(`OK: import ${spec} (${Object.keys(mod).length} exports)`);
         }
-    ' "$name" "$2")
+    ' "$2" "$3")
 }
 
 install_into() { # <dir> <package spec>

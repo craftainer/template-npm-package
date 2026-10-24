@@ -47,7 +47,7 @@ for ((i = 1; i <= attempts; i++)); do
         if [[ -n $found ]]; then
             mkdir "$tmp/published"
             install_into "$tmp/published" "$name@$version"
-            check_import "$tmp/published" "$version"
+            check_import "$tmp/published" "$name" "$version"
             exit 0
         fi
     # Anything but "not found" (network, auth) is a real failure.
@@ -62,4 +62,4 @@ for ((i = 1; i <= attempts; i++)); do
     fi
 done
 echo "NOTICE: $name@$version is not yet on the registry (staged, awaiting approval?)."
-echo "NOTICE: approve it with 'npm stage approve <stage-id>'; the tarball check above passed."
+echo "NOTICE: approve it with 'npm stage approve <stage-id>'."

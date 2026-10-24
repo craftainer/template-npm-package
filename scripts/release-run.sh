@@ -19,6 +19,7 @@ node_version=$(sed -n 's/^ARG NODE_VERSION=//p' .devcontainer/Dockerfile)
 corepack_version=$(sed -n 's/^COREPACK_VERSION=//p' scripts/develop.d/10-corepack.sh)
 env_args=()
 for name in RELEASE_VERSION RELEASE_TAG RELEASE_ARCH NPM_PUBLISH NPM_TOKEN \
+    RELEASE_CHECK_ATTEMPTS RELEASE_CHECK_DELAY \
     $(env | grep -E '^(GITHUB_|RUNNER_|ACTIONS_)' | cut -d= -f1); do
     env_args+=(-e "$name")
 done

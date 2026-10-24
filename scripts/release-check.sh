@@ -21,4 +21,4 @@ version=$(tarball_field "$tarball" version)
 echo "== local tarball: $(basename "$tarball")"
 mkdir "$tmp/local"
 install_into "$tmp/local" "$tarball"
-check_import "$tmp/local" "$version"
+check_import "$tmp/local" "$name" "$version"
