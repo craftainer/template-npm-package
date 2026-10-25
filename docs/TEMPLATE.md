@@ -506,7 +506,9 @@ job has neither that nor the token.
 Before any stage or publish it checks, with `check_repository` in
 `scripts/release-lib.sh`, that the tarball's `repository` names
 `https://github.com/$GITHUB_REPOSITORY` (owner and repo case-sensitive). Every GitHub form npm
-accepts passes (the scheme is case-insensitive, a `www.` host prefix is dropped, and the host is case-insensitive only in a plain `http(s)://` URL, as in npm's hosted-git-info): the `owner/repo` and `github:owner/repo` shorthands,
+accepts passes (as in npm's hosted-git-info, the scheme is case-insensitive,
+a `www.` host prefix is dropped, and the host is case-insensitive only in a
+plain `http(s)://` URL): the `owner/repo` and `github:owner/repo` shorthands,
 `[git+]https://`, `git://`, `[git+]ssh://` and `git@github.com:owner/repo`
 URLs, with or without `.git` and a trailing slash; another host, extra path
 segments or a `#ref` do not. This is checked because npm's provenance
@@ -564,9 +566,10 @@ defensively; never map `NPM_TOKEN` to it in a workflow.
 **`release-check`** installs the `dist/` tarball into a scratch project and
 imports every `exports` entry (ESM, Node), checking the installed version.
 **`verify-published`** (when `NPM_PUBLISH` is set) looks the version up with
-`npm view`, retrying for registry propagation (10 attempts, 5 s doubling up to
-60 s, about 6 minutes: npm can take minutes to show a fresh version; tune with
-`RELEASE_CHECK_ATTEMPTS`, `RELEASE_CHECK_DELAY`, `RELEASE_CHECK_MAX_DELAY`): if found it is installed from
+`npm view`, retrying for registry propagation (10 attempts, 5 s
+doubling up to 60 s, about 6 minutes: npm can take minutes to show a fresh
+version; tune with `RELEASE_CHECK_ATTEMPTS`, `RELEASE_CHECK_DELAY`,
+`RELEASE_CHECK_MAX_DELAY`): if found it is installed from
 the registry and imported too; if it never appears, the script fails with an
 error, because a release whose package did not appear must not pass. That
 includes a staged first release that is not approved yet: approve it

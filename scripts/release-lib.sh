@@ -56,7 +56,11 @@ npm_view_field() {
             if (!t) process.exit(0);
             let v = JSON.parse(t);
             if (Array.isArray(v)) v = v[v.length - 1];
-            process.stdout.write(String(v ?? ""));'
+            if (typeof v !== "string") {
+                console.error(`unexpected npm view output: ${t}`);
+                process.exit(1);
+            }
+            process.stdout.write(v);'
         return
     fi
     code=$(printf '%s' "$out" | node -e '
