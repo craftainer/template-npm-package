@@ -18,13 +18,25 @@
   `../workflows/template-sync.yml`: picks the latest tag for a channel,
   applies the `replace`/`merge` tiers between two template checkouts and
   the instance working tree, and reads/writes
-  `../template-sync-state.json`.
+  `../template-sync-state.json`. Its `check-apply` subcommand cross-checks
+  `apply`'s exit status against the summary it wrote, so a crash that
+  exits 1 is not read as merge conflicts. A merge-tier file the instance
+  never changed takes the new version outright; a binary one the instance
+  did change is reported as a conflict and left as it is. It catches the broad `apply` failure with
+  `logging.exception` rather than a `noqa`, so instances that don't
+  select ruff's `BLE` rules see no unused-`noqa` finding.
+  `apply` is not atomic: on exit 2, files written before the error stay on
+  disk. CI is safe because the runner checkout is discarded and the sync
+  state does not advance. After a failed manual run, reset the working tree
+  with `git checkout -- .` and then `git clean -fd` (separate commands).
 - `test_template_sync.py` — stdlib `unittest` tests for
   `template_sync.py`'s replace and merge tiers (including the executable
   bit, re-running a merge, symlinked destinations, and `git merge-file`
-  errors raising instead of counting as conflicts, and `apply`'s exit
-  codes: 0 clean, 1 conflicts, 2 error, including a missing or undecodable
-  manifest and a failing `tier_paths`), glob expansion of
+  errors raising instead of counting as conflicts, binary files counting
+  as conflicts, symlinked destinations kept on removal, one tree walk for
+  all globs, `apply`'s exit codes: 0 clean, 1 conflicts, 2 error,
+  including a missing or undecodable manifest and a failing `tier_paths`,
+  and `check-apply`), glob expansion of
   manifest entries, and a check that every script a workflow runs directly
   is executable; backs the `scripts-tests` prek hook.
 - `assemble_dist.py` / `has_make_target.sh` — helpers of
@@ -34,18 +46,31 @@
   tell whether the Makefile defines a target without running it (the
   `verify-published` probe; the name is matched literally, and a target only
   listed in `.PHONY` counts as defined since `make` runs it as a no-op).
-  `test_release_scripts.py` tests both; `scripts-tests` runs it. Keep
+  `assemble_dist.py` reads each tarball once and sets the staged `dist/`'s
+  mode only after extracting, so a `.` member cannot leave it unreadable to
+  another user. `has_make_target.sh` runs no recipe, but make still evaluates
+  `$(shell ...)` and `include` while parsing the Makefile.
+  `test_release_scripts.py` tests both, `verify_release_tag.sh`, and that
+  `../../scripts/develop.sh` never nests `fetch` inside `retry`;
+  `scripts-tests` runs it. Keep
   `assemble_dist.py` clean under `ruff check --select ALL` (bar `COM812` and
   `CPY001`), so instances that select `PL` etc. need no per-file ignores.
   `template_sync.py` and its test keep to a 100-column line length and name
   their magic numbers (`MAX_CONFLICTS`, `FIRST_WEEK_LAST_DAY`), so instances
   running ruff's `E501` and `PLR2004` need no ignores for them either.
+- `verify_release_tag.sh` — the `release` job's check that an already
+  published release's tag points at the commit the run built (fails closed;
+  retries only transient lookup errors, six attempts over about two
+  minutes, and never a missing tag). Tested against a fake `gh` in
+  `test_release_scripts.py`.
 - `find_moderation_result.sh` / `test_moderation_scripts.py` — the check
   step shared by `../workflows/moderate-bug-fix-apply.yml` and
   `../workflows/moderate-feature-build-apply.yml`: asks the API for the
   `moderation-result` artifact by name (so it is found however many
-  artifacts the run has), writes `found=true|false`, and logs a notice when
-  the artifact has expired. The tests run it against a fake `gh`.
+  artifacts the run has) and writes `found=true|false`. It fails on an
+  expired artifact (a produced result that can no longer be applied), an
+  API error, and an empty or unrecognised response. The tests run it
+  against a fake `gh`.
 - `run_claude.sh` — invokes `claude -p` for one issue-moderation stage
   inside the devcontainer; shared by all four Claude-invoking
   `../workflows/moderate-*.yml` jobs. See `../workflows/README.md`'s
