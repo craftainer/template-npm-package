@@ -39,6 +39,17 @@ version=$(tarball_field "$tarball" version)
 tag=$(dist_tag "$name" "$version")
 echo "Publishing $name@$version under dist-tag '$tag'."
 
+# Re-runnable (docs/TEMPLATE.md, release flow): a re-run of the failed jobs
+# after an earlier attempt already published must not publish again, which
+# npm rejects. `npm view name@version version` prints nothing for a version
+# that is not published (or is only staged), so a lookup failure falls
+# through to publishing. A staged tarball cannot be seen here; approve or
+# discard it with `npm stage` before re-running.
+if [[ -n $(npm view "$name@$version" version 2>/dev/null || true) ]]; then
+    echo "$name@$version is already on the registry -- nothing to publish."
+    exit 0
+fi
+
 if [[ -n ${NPM_TOKEN:-} ]]; then
     echo "NPM_TOKEN set -- staging $(basename "$tarball") with the bootstrap token."
     npmrc=$(mktemp)
