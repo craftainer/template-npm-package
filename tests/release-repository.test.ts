@@ -43,6 +43,14 @@ describe("check_repository", () => {
     `https://github.com/${repo}`,
     `https://github.com/${repo}/`,
     `https://github.com/${repo}.git/`,
+    `http://github.com/${repo}`,
+    `git://github.com/${repo}.git`,
+    `git+ssh://git@github.com/${repo}.git`,
+    `ssh://git@github.com/${repo}`,
+    `git@github.com:${repo}.git`,
+    `git+ssh://git@github.com:${repo}.git`,
+    `github:${repo}`,
+    repo,
   ])("passes when %s matches", (url) => {
     const r = check(tarballWith({ repository: { type: "git", url } }), repo);
     expect(r.status).toBe(0);
@@ -69,9 +77,23 @@ describe("check_repository", () => {
     );
     expect(r.status).toBe(1);
     expect(r.stderr).toContain(
-      "expected https://github.com/craftainer/lib-example",
+      "expected it to name https://github.com/craftainer/lib-example",
     );
     expect(r.stderr).toContain(`git+https://github.com/${repo}.git`);
+  });
+
+  it.each([
+    "https://gitlab.com/craftainer/lib-example",
+    "https://github.com/craftainer/lib-example/tree/main",
+    "https://github.com/craftainer/lib-example.git#main",
+    "https://github.com/craftainer/lib-example-2",
+    "https://github.com/other/craftainer/lib-example",
+    "gitlab:craftainer/lib-example",
+    "https://example.com/github.com/craftainer/lib-example",
+    "not a url",
+  ])("fails on %s", (url) => {
+    const r = check(tarballWith({ repository: { url } }), repo);
+    expect(r.status).toBe(1);
   });
 
   it("fails on a different case (npm compares case-sensitively)", () => {

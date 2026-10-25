@@ -55,9 +55,9 @@ it. It contains:
   project and imports every `exports` entry (it gates the release, so only
   the local artifact), and a `verify-published` target that, after
   `publish-packages` and when publishing is on, installs the version from the
-  registry the same way. A version that is not on the registry yet is a
-  notice, not a failure, because a staged release is not installable until
-  it is approved;
+  registry the same way. A version that never appears on the registry
+  fails it, including a staged release that is not approved yet (re-run the
+  job after approval);
 - the GPL-3.0 license, matching the other templates, and a sync manifest
   that classifies the scaffold (`package.json`, `tsconfig*.json`,
   `tsdown.config.ts`, `vitest.config.ts`, `src/`, `tests/`,
@@ -83,10 +83,11 @@ and deletes the token, and later releases go through OIDC.
   fall back to the pinned Node image there. The Node version then has one
   source (`.devcontainer/Dockerfile`), but a package's `engines.node` has to
   be kept in step by hand.
-- A first release that is staged and not yet approved passes
-  `verify-published` as a notice; the registry install is verified
-  only on later releases or after approval, so a staged release that is
-  never approved is not caught by the release.
+- A first release that is staged and not yet approved fails
+  `verify-published` (the job runs without secrets and cannot tell a staged
+  upload from a lost one); a maintainer approves it and re-runs that job.
+  Updated from the original "notice, not a failure" after a downstream review
+  showed a release whose package never appeared passing verification.
 - `npm stage` is new and its CLI may still change; the scripts pin npm
   exactly and Renovate bumps it.
 - The tool versions in `package.json` are instance-owned, so a template-side

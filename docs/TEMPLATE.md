@@ -485,9 +485,12 @@ manual run; in CI an unset variable means the whole job is skipped. The job
 runs once, not per arch, and holds `id-token: write`; the per-arch `build`
 job has neither that nor the token.
 Before any stage or publish it checks, with `check_repository` in
-`scripts/release-lib.sh`, that the tarball's `repository.url` (`git+` prefix,
-`.git` suffix and trailing slash stripped, case-sensitive) equals
-`https://github.com/$GITHUB_REPOSITORY`, because npm's provenance
+`scripts/release-lib.sh`, that the tarball's `repository` names
+`https://github.com/$GITHUB_REPOSITORY` (case-sensitive). Every GitHub form npm
+accepts passes: the `owner/repo` and `github:owner/repo` shorthands,
+`[git+]https://`, `git://`, `[git+]ssh://` and `git@github.com:owner/repo`
+URLs, with or without `.git` and a trailing slash; another host, extra path
+segments or a `#ref` do not. This is checked because npm's provenance
 verification rejects any other value (E422); it is skipped with a notice
 when `GITHUB_REPOSITORY` is unset (a local run), and it only runs when
 `NPM_PUBLISH` is set. `npm_config_dry_run=true` turns either path into a
@@ -532,13 +535,15 @@ fails loudly at `publish-packages` when `NPM_PUBLISH` is set.
 trusted publishing breaks if it is present. `publish-packages` unsets it
 defensively; never map `NPM_TOKEN` to it in a workflow.
 
-**`release-check`** always installs the `dist/` tarball into a scratch
-project and imports every `exports` entry (ESM, Node), checking the
-installed version. When `NPM_PUBLISH` is set it then looks the version up
-with `npm view`: if found it is installed from the registry and imported
-too; if not, it prints a "not yet on the registry (staged, awaiting
-approval?)" notice and passes, because a staged release is not installable
-until approved. "Not found" is both an E404 and `npm view` exiting 0 with
+**`release-check`** installs the `dist/` tarball into a scratch project and
+imports every `exports` entry (ESM, Node), checking the installed version.
+**`verify-published`** (when `NPM_PUBLISH` is set) looks the version up with
+`npm view`, retrying for registry propagation: if found it is installed from
+the registry and imported too; if it never appears, the script fails with an
+error, because a release whose package did not appear must not pass. That
+includes a staged first release that is not approved yet: approve it
+(`npm stage approve <stage-id>`) and re-run the `verify-published` job.
+"Not found" is both an E404 and `npm view` exiting 0 with
 empty output (the package exists, that version does not). Any other lookup
 failure (network, auth) fails the check.
 The template itself never publishes (`NPM_PUBLISH` unset) but its release
