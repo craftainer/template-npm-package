@@ -51,6 +51,15 @@ describe("check_repository", () => {
     `git+ssh://git@github.com:${repo}.git`,
     `github:${repo}`,
     repo,
+    // Forms npm's hosted-git-info normalizes: scheme case-insensitive, a
+    // `www.` prefix dropped, host case-insensitive in a plain http(s) URL.
+    `HTTPS://GitHub.com/${repo}`,
+    `https://www.github.com/${repo}.git`,
+    `https://GITHUB.COM/${repo}`,
+    `git+https://www.github.com/${repo}.git`,
+    `GIT+HTTPS://github.com/${repo}`,
+    `git+ssh://git@www.github.com/${repo}.git`,
+    `git@www.github.com:${repo}.git`,
   ])("passes when %s matches", (url) => {
     const r = check(tarballWith({ repository: { type: "git", url } }), repo);
     expect(r.status).toBe(0);
@@ -91,6 +100,11 @@ describe("check_repository", () => {
     "gitlab:craftainer/lib-example",
     "https://example.com/github.com/craftainer/lib-example",
     "not a url",
+    // npm itself rejects a mixed-case host behind git+ and in git/ssh/scp URLs.
+    "git+https://GitHub.com/craftainer/lib-example",
+    "git@GitHub.com:craftainer/lib-example.git",
+    "ssh://git@GitHub.com/craftainer/lib-example",
+    "https://notgithub.com/craftainer/lib-example",
   ])("fails on %s", (url) => {
     const r = check(tarballWith({ repository: { url } }), repo);
     expect(r.status).toBe(1);
@@ -117,5 +131,18 @@ describe("check_repository", () => {
     const r = check(tarballWith({}));
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("NOTICE: GITHUB_REPOSITORY not set");
+  });
+
+  it("treats a value starting with - as data, not a node option", () => {
+    for (const url of ["--version", "-p", "--eval=1"]) {
+      const r = spawnSync(
+        "bash",
+        ["-c", `source "${lib}" && normalize_repo_url "$1"`, "bash", url],
+        { encoding: "utf8" },
+      );
+      expect(r.status).toBe(0);
+      expect(r.stdout).toBe("");
+      expect(r.stderr).toBe("");
+    }
   });
 });
