@@ -2,7 +2,7 @@
   "name": "template-npm-package",
   "version": "0.0.0",
   "description": "Example ESM TypeScript package: replace with the real description.",
-  "license": "GPL-3.0-or-later",
+  "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/craftainer/template-npm-package.git"
