@@ -557,7 +557,7 @@ records why.
   was published; (3) for the stage-only bootstrap, add the `NPM_TOKEN`
   secret (organization or repository; a granular token, "Read and write
   (stage only)"), run the release, approve the stage, configure the trusted
-  publisher on npmjs.com and delete `NPM_TOKEN` (see `publish-packages` below).
+  publisher on npmjs.com (environment `release`) and remove the repository's access to `NPM_TOKEN` (see `publish-packages` below).
 - **Template-owned tooling (`replace` tier).** `scripts/release-*.sh` (the
   release logic below), `scripts/develop.d/10-corepack.sh` (enables pnpm
   through Corepack, which reads `packageManager`) and
@@ -606,14 +606,29 @@ into the build (restored on exit, never committed).
 
 `build`, `publish-packages` and the SBOM's Node work run through
 `scripts/release-run.sh`: on the host when it has pnpm (the devcontainer),
-else in the `node:<NODE_VERSION>` image (the bare runners `release.yml` uses,
+else in the `NODE_IMAGE` pinned in `scripts/release-lib.sh` (tag and digest;
+its tag must equal `.devcontainer/Dockerfile`'s `NODE_VERSION`, which
+`release-run.sh` checks; the bare runners `release.yml` uses,
 which have docker only; only Syft runs on the host). That is how
 `publish-packages` sets up Node on its bare runner: `release.yml` gives that
 job a checkout and the downloaded `dist/` and no `setup-node`, so nothing
 is installed on the runner itself; the pinned image supplies Node, and
 `release-lib.sh`'s `use_npm` the exact npm. pnpm is not needed to upload a
-tarball, so it is never invoked there. The image gets the OIDC variables
-(`ACTIONS_ID_TOKEN_REQUEST_*`) and `NPM_TOKEN`, never `NODE_AUTH_TOKEN`. Corepack ships with Node
+tarball, so it is never invoked there. The container gets an explicit
+allowlist of variables, not the runner's environment: `RELEASE_*`,
+`NPM_PUBLISH` and the retry knobs for every script, and only for
+`release-publish.sh` also `NPM_TOKEN`, the OIDC variables
+(`ACTIONS_ID_TOKEN_REQUEST_*`) and the `GITHUB_*`/`RUNNER_ENVIRONMENT` names
+npm reads for provenance. `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN` and the
+rest never enter the container that runs `pnpm install` and the build, so
+dependency code that executes there cannot use them. `NODE_AUTH_TOKEN` is
+never forwarded. The registry installs of `npm` and `corepack` run with
+`--ignore-scripts` and without the publish credentials (`env -u`).
+**Residual:** those two installs fetch the pinned version from the live
+registry without an integrity hash of their own (`npm install pkg@x.y.z`
+has no flag for one; the registry's packument supplies it). A committed
+lockfile for them would close that; this template accepts the residual, and
+the Node and Syft images are pinned by digest. Corepack ships with Node
 only up to 24.x, so the hook `scripts/develop.d/10-corepack.sh` and the image
 fallback install the pinned `corepack` from npm when it is missing. Each
 script resolves the exact npm pinned in `scripts/release-lib.sh` once (the
@@ -664,8 +679,11 @@ stage-only token is documented to stage, deprecate and move dist-tags only.
 Approve or reject the existing stage (`npm stage approve|reject <stage-id>`)
 before re-running `publish-packages`; after approving, re-run only
 `verify-published`. Afterwards configure the package's trusted publisher on
-npmjs.com (repository, workflow `release.yml`), delete the `NPM_TOKEN`
-secret, and later releases take the OIDC path. npm expires a trusted
+npmjs.com (repository, workflow `release.yml`, environment `release`) and
+take the repository out of the `NPM_TOKEN` secret's reach (delete a
+repository-level secret; for an organization secret, exclude the repository
+from its access, since a present token wins over OIDC), and later releases
+take the OIDC path. npm expires a trusted
 publisher that has not published within 48 hours of being configured.
 The dist-tag is chosen by `dist_tag` in `scripts/release-lib.sh`: a
 prerelease (`1.2.3-rc.1`) gets its first identifier (`rc`), or `next` when

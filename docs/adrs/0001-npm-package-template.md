@@ -50,7 +50,8 @@ it. It contains:
   `npm stage publish` (the token is stage-only, passed in a temporary npmrc),
   and without it `npm publish --provenance` through OIDC trusted publishing.
   It publishes the packed tarball from `dist/`, uses an exact pinned npm
-  (11.15.0 or later) through `npx`, and never sets `NODE_AUTH_TOKEN`;
+  (11.15.0 or later) installed into a temporary prefix, and never sets
+  `NODE_AUTH_TOKEN`;
 - a `release-check` that installs the `dist/` tarball into a scratch
   project and imports every `exports` entry (it gates the release, so only
   the local artifact), and a `verify-published` target that, after
