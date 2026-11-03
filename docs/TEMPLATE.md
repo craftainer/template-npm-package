@@ -740,7 +740,8 @@ into the build (restored on exit, never committed).
 `scripts/release-run.sh`: on the host when it has pnpm (the devcontainer),
 else in the `NODE_IMAGE` pinned in `scripts/release-lib.sh` (tag and digest;
 its tag must equal `.devcontainer/Dockerfile`'s `NODE_VERSION`, which
-`release-run.sh` checks; the bare runners `release.yml` uses,
+`release-run.sh` checks and `.github/scripts/test_release_pins.py` checks on
+every PR; Renovate's `node` group bumps both in one PR; the bare runners `release.yml` uses,
 which have docker only; only Syft runs on the host). That is how
 `publish-packages` sets up Node on its bare runner: `release.yml` gives that
 job a checkout and the downloaded `dist/` and no `setup-node`, so nothing

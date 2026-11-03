@@ -86,7 +86,7 @@
       ]
     },
     {
-      "description": "Container images that scripts/release-lib.sh pins by tag and digest (NODE_IMAGE, SYFT_IMAGE). The tag is currentValue and the sha256 is currentDigest, so Renovate bumps both. NODE_IMAGE moves with .devcontainer/Dockerfile's NODE_VERSION (rule "node" in packageRules groups them); release-run.sh and test_release_pins.py fail if they disagree.",
+      "description": "Container images that scripts/release-lib.sh pins by tag and digest (NODE_IMAGE, SYFT_IMAGE). The tag is currentValue and the sha256 is currentDigest, so Renovate bumps both. NODE_IMAGE moves with .devcontainer/Dockerfile's NODE_VERSION (the node packageRule groups them); release-run.sh and test_release_pins.py fail if they disagree.",
       "customType": "regex",
       "managerFilePatterns": ["/^scripts/release-lib\\.sh$/"],
       "matchStrings": [
