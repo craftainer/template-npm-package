@@ -581,6 +581,12 @@ records why.
   and attw fail when they disagree. `isolatedDeclarations` is on, so every
   public export needs an explicit type annotation (the declaration emit
   does not infer).
+- **pnpm supply-chain settings.** `pnpm-workspace.yaml` (ignore tier, like
+  `package.json`) sets `minimumReleaseAge: 4320` (3 days, strict because it is
+  explicit), `blockExoticSubdeps` and `strictDepBuilds` explicitly, since pnpm 11+
+  reads settings only from there. `trustPolicy` is left off: pnpm documents
+  `no-downgrade` with no recommendation for libraries, and it fails installs of
+  older packages that lack provenance.
 - **Node lives in two places.** `.devcontainer/Dockerfile`'s `NODE_VERSION`
   (the toolchain) and `package.json`'s `engines.node` (what consumers need).
   Change them together. The release scripts read the Dockerfile's value to
@@ -617,10 +623,12 @@ is installed on the runner itself; the pinned image supplies Node, and
 tarball, so it is never invoked there. The container gets an explicit
 allowlist of variables, not the runner's environment: `RELEASE_*`,
 `NPM_PUBLISH` and the retry knobs for every script, and only for
-`release-publish.sh` also `NPM_TOKEN`, the OIDC variables
-(`ACTIONS_ID_TOKEN_REQUEST_*`) and the `GITHUB_*`/`RUNNER_ENVIRONMENT` names
-npm reads for provenance. `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN` and the
-rest never enter the container that runs `pnpm install` and the build, so
+`release-publish.sh` also `NPM_TOKEN` and the job's `GITHUB_*`, `RUNNER_*`
+and `ACTIONS_*` variables (the OIDC request variables and whatever npm reads
+for provenance) except `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN`,
+`ACTIONS_RESULTS_URL` and `ACTIONS_CACHE_URL`; that step runs no dependency
+code, so a deny-list is used there. `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN`
+and the rest never enter the container that runs `pnpm install` and the build, so
 dependency code that executes there cannot use them. `NODE_AUTH_TOKEN` is
 never forwarded. The registry installs of `npm` and `corepack` run with
 `--ignore-scripts` and without the publish credentials (`env -u`).

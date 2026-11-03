@@ -28,19 +28,25 @@ corepack_version=$(sed -n 's/^COREPACK_VERSION=//p' scripts/develop.d/10-corepac
 # `pnpm install` and the build run dependency code (tsdown and its tree), which
 # must not see GITHUB_TOKEN (contents/packages: write), ACTIONS_RUNTIME_TOKEN,
 # ACTIONS_ID_TOKEN_REQUEST_* or the other runner variables. Only the publish
-# step gets what npm needs for OIDC trusted publishing and provenance, and
-# NPM_TOKEN; it runs no dependency code (a tarball upload with a pinned npm).
+# step gets the job environment (minus GITHUB_TOKEN, ACTIONS_RUNTIME_TOKEN,
+# ACTIONS_RESULTS_URL and ACTIONS_CACHE_URL) and NPM_TOKEN, for OIDC trusted
+# publishing and provenance; it runs no dependency code (a tarball upload with
+# a pinned npm).
 # NODE_AUTH_TOKEN is deliberately never forwarded: its presence, even empty,
 # breaks OIDC publishing.
 names=(RELEASE_VERSION RELEASE_TAG RELEASE_ARCH NPM_PUBLISH
     RELEASE_CHECK_ATTEMPTS RELEASE_CHECK_DELAY RELEASE_CHECK_MAX_DELAY)
 case ${1:-} in
 scripts/release-publish.sh)
-    names+=(NPM_TOKEN ACTIONS_ID_TOKEN_REQUEST_URL ACTIONS_ID_TOKEN_REQUEST_TOKEN
-        GITHUB_ACTIONS GITHUB_SERVER_URL GITHUB_REPOSITORY GITHUB_REPOSITORY_ID
-        GITHUB_REPOSITORY_OWNER_ID GITHUB_REF GITHUB_SHA GITHUB_WORKFLOW
-        GITHUB_WORKFLOW_REF GITHUB_WORKFLOW_SHA GITHUB_RUN_ID GITHUB_RUN_ATTEMPT
-        GITHUB_EVENT_NAME RUNNER_ENVIRONMENT)
+    # A deny-list, not an allowlist: npm reads an undocumented set of GITHUB_*
+    # and RUNNER_* names for provenance, and this step runs no dependency code.
+    names+=(NPM_TOKEN)
+    while IFS= read -r name; do
+        case $name in
+        GITHUB_TOKEN | ACTIONS_RUNTIME_TOKEN | ACTIONS_RESULTS_URL | ACTIONS_CACHE_URL) ;;
+        GITHUB_* | RUNNER_* | ACTIONS_*) names+=("$name") ;;
+        esac
+    done < <(compgen -e)
     ;;
 esac
 env_args=()
