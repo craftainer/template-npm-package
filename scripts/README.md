@@ -19,8 +19,10 @@
   `safe.directory`, `prek install`, then every `post-create.d/*.sh`.
 - `release-*.sh` — the release logic behind the `Makefile` targets (see
   `docs/TEMPLATE.md`, "Package template notes"). `release-lib.sh` (sourced)
-  pins the npm and Syft versions; `release-run.sh` runs a script on the
-  host, or in the pinned Node image when the host has no pnpm;
+  pins the npm version and the Node and Syft images (tag plus digest,
+  bumped by Renovate); `release-run.sh` runs a script on the host, or in the
+  pinned Node image when the host has no pnpm, forwarding only an explicit
+  allowlist of variables (the publish credentials only to `release-publish.sh`);
   `release-build.sh` stamps the version, builds and packs into `dist/`;
   `release-sbom.sh` (+ `release-sbom-install.sh`, `release-field.sh`) writes the SPDX SBOM;
   `release-publish.sh` (`make publish-packages`; `make publish` is a no-op) skips (with a `::warning::`), first checks
@@ -54,6 +56,14 @@
   follows.
 - Keep `NPM_VERSION` in `release-lib.sh` at 11.15.0 or later (staged
   publishing) and pin it exactly, with its `# renovate:` marker.
+- Pin container images in `release-lib.sh` by tag and digest
+  (`NODE_IMAGE`, `SYFT_IMAGE`) with their `# renovate:` marker.
+- Forward variables into the release container by name from an allowlist in
+  `release-run.sh`; never a `GITHUB_*`/`ACTIONS_*` prefix match for steps
+  that run dependency code. The one exception is `release-publish.sh`, which
+  runs none (a tarball upload with a pinned npm) and gets the job
+  environment minus `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN`, `ACTIONS_RESULTS_URL`
+  and `ACTIONS_CACHE_URL`, because npm reads an undocumented set of names for provenance.
 
 ## Don't
 

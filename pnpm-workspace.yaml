@@ -1,0 +1,6 @@
+# pnpm 11+ reads project settings only from here (not package.json#pnpm).
+# Explicit supply-chain settings; see docs/TEMPLATE.md.
+# 3 days; strict (fail, not fall back) because it is set explicitly.
+minimumReleaseAge: 4320
+blockExoticSubdeps: true
+strictDepBuilds: true

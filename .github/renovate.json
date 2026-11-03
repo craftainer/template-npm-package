@@ -62,6 +62,14 @@
       ]
     },
     {
+      "description": "Container images that scripts/release-lib.sh pins by tag and digest (NODE_IMAGE, SYFT_IMAGE). The tag is currentValue and the sha256 is currentDigest, so Renovate bumps both. NODE_IMAGE moves with .devcontainer/Dockerfile's NODE_VERSION (same group); release-run.sh fails if they disagree.",
+      "customType": "regex",
+      "managerFilePatterns": ["/^scripts/release-lib\\.sh$/"],
+      "matchStrings": [
+        "# renovate: datasource=docker depName=(?<depName>\\S+?)(?: versioning=(?<versioning>\\S+))?\\s*\\n[A-Z0-9_]+_IMAGE=[^:\\s]+(?:/[^:\\s]+)*:(?<currentValue>[^@\\s]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ]
+    },
+    {
       "customType": "regex",
       "managerFilePatterns": [
         "/^\\.github/workflows/.*\\.ya?ml$/"

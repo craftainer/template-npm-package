@@ -7,8 +7,14 @@
 # renovate: datasource=npm depName=npm
 NPM_VERSION=11.19.1
 
+# Container images, pinned by tag and digest (the digest is what is pulled; the
+# tag is for humans and Renovate, which bumps both: see the regex manager in
+# .github/renovate.json). NODE_IMAGE's tag must match .devcontainer/Dockerfile's
+# NODE_VERSION (release-run.sh checks).
+# renovate: datasource=docker depName=node versioning=docker
+NODE_IMAGE=node:24.22.1-trixie-slim@sha256:89c5244bc22a9bc3287d89ebc7e49b9cb5bb84cd40e6175ac3421d5a9f68b95a
 # renovate: datasource=docker depName=anchore/syft
-SYFT_VERSION=v1.52.0
+SYFT_IMAGE=anchore/syft:v1.52.0@sha256:500e2d872ac019436926e8322b4fc1f39441d94d21f6f4046c6ff29b30e8cb02
 
 export npm_config_update_notifier=false
 # Corepack's implicit shims prompt before downloading pnpm; there is no one
@@ -34,7 +40,10 @@ use_npm() {
         local prefix
         prefix=$(mktemp -d)
         on_exit "rm -rf '$prefix'"
-        "$NPM_BIN" install --prefix "$prefix" --no-audit --no-fund --silent "npm@$NPM_VERSION"
+        # No publish credentials and no lifecycle scripts while the registry's
+        # tarball is fetched and unpacked (publish-packages holds OIDC and NPM_TOKEN).
+        env -u NPM_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            "$NPM_BIN" install --prefix "$prefix" --ignore-scripts --no-audit --no-fund --silent "npm@$NPM_VERSION"
         NPM_BIN=$prefix/node_modules/.bin/npm
     fi
 }
