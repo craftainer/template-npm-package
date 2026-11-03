@@ -22,9 +22,10 @@ class NodeImagePinTest(unittest.TestCase):
         lib = (ROOT / "scripts/release-lib.sh").read_text(encoding="utf-8")
         version = re.search(r"^ARG NODE_VERSION=(\S+)$", dockerfile, re.MULTILINE)
         image = re.search(r"^NODE_IMAGE=(\S+)$", lib, re.MULTILINE)
-        self.assertIsNotNone(version, "no `ARG NODE_VERSION=` in .devcontainer/Dockerfile")
-        self.assertIsNotNone(image, "no `NODE_IMAGE=` in scripts/release-lib.sh")
-        assert version is not None and image is not None  # noqa: S101 -- type narrowing
+        if version is None:
+            self.fail("no `ARG NODE_VERSION=` in .devcontainer/Dockerfile")
+        if image is None:
+            self.fail("no `NODE_IMAGE=` in scripts/release-lib.sh")
         pattern = rf"node:{re.escape(version.group(1))}-trixie-slim@sha256:[a-f0-9]{{64}}"
         self.assertRegex(
             image.group(1),
