@@ -51,6 +51,12 @@
       "pinDigests": true
     },
     {
+      "description": "Node is pinned twice: .devcontainer/Dockerfile's NODE_VERSION (node-version datasource) and scripts/release-lib.sh's NODE_IMAGE (docker datasource, same depName). One group, listed after the generic groups so it overrides the patch/minor and major groups for every update type, puts both in one PR; test_release_pins.py fails a PR where the two disagree.",
+      "matchDepNames": ["node"],
+      "matchDatasources": ["node-version", "docker"],
+      "groupName": "node"
+    },
+    {
       "description": "Renovate can't regenerate .devcontainer/devcontainer-lock.json, so features are bumped by hand together with it (see .devcontainer/README.md).",
       "matchManagers": ["devcontainer"],
       "matchDepTypes": ["feature"],
@@ -80,7 +86,7 @@
       ]
     },
     {
-      "description": "Container images that scripts/release-lib.sh pins by tag and digest (NODE_IMAGE, SYFT_IMAGE). The tag is currentValue and the sha256 is currentDigest, so Renovate bumps both. NODE_IMAGE moves with .devcontainer/Dockerfile's NODE_VERSION (same group); release-run.sh fails if they disagree.",
+      "description": "Container images that scripts/release-lib.sh pins by tag and digest (NODE_IMAGE, SYFT_IMAGE). The tag is currentValue and the sha256 is currentDigest, so Renovate bumps both. NODE_IMAGE moves with .devcontainer/Dockerfile's NODE_VERSION (rule "node" in packageRules groups them); release-run.sh and test_release_pins.py fail if they disagree.",
       "customType": "regex",
       "managerFilePatterns": ["/^scripts/release-lib\\.sh$/"],
       "matchStrings": [
