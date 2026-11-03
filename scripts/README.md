@@ -59,7 +59,11 @@
 - Pin container images in `release-lib.sh` by tag and digest
   (`NODE_IMAGE`, `SYFT_IMAGE`) with their `# renovate:` marker.
 - Forward variables into the release container by name from an allowlist in
-  `release-run.sh`; never a `GITHUB_*`/`ACTIONS_*` prefix match.
+  `release-run.sh`; never a `GITHUB_*`/`ACTIONS_*` prefix match for steps
+  that run dependency code. The one exception is `release-publish.sh`, which
+  runs none (a tarball upload with a pinned npm) and gets the job
+  environment minus `GITHUB_TOKEN`, `ACTIONS_RUNTIME_TOKEN`, `ACTIONS_RESULTS_URL`
+  and `ACTIONS_CACHE_URL`, because npm reads an undocumented set of names for provenance.
 
 ## Don't
 

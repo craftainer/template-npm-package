@@ -557,7 +557,8 @@ records why.
   was published; (3) for the stage-only bootstrap, add the `NPM_TOKEN`
   secret (organization or repository; a granular token, "Read and write
   (stage only)"), run the release, approve the stage, configure the trusted
-  publisher on npmjs.com (environment `release`) and remove the repository's access to `NPM_TOKEN` (see `publish-packages` below).
+  publisher on npmjs.com (environment `release`) and remove the repository's
+  access to `NPM_TOKEN` (see `publish-packages` below).
 - **Template-owned tooling (`replace` tier).** `scripts/release-*.sh` (the
   release logic below), `scripts/develop.d/10-corepack.sh` (enables pnpm
   through Corepack, which reads `packageManager`) and
