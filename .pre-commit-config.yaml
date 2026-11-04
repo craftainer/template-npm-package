@@ -59,14 +59,6 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
-<<<<<<< /home/runner/work/template-npm-package/template-npm-package/.pre-commit-config.yaml
-  # Every tool below is a project dev-dependency, run through its package.json
-  # script (`pnpm run <script>`): package.json is the single source of both the
-  # pinned versions and the exact flags, so a hook can't drift from
-  # `pnpm run <script>` run by hand. The build, publint
-  # and attw hooks run in this order (prek runs hooks sequentially) because the
-  # last two inspect the built `dist/`.
-=======
   # Guard for the upstream-owned scripts in .github/scripts/: base ships
   # them to every instance, whose own ruff-format hook then checks them
   # against .github/scripts/ruff.toml (the closest config wins), so an
@@ -86,7 +78,12 @@ repos:
         files: ^\.github/scripts/.*\.py$
         stages: [pre-commit, manual]
 
->>>>>>> /tmp/template-new/.pre-commit-config.yaml
+  # Every tool below is a project dev-dependency, run through its package.json
+  # script (`pnpm run <script>`): package.json is the single source of both the
+  # pinned versions and the exact flags, so a hook can't drift from
+  # `pnpm run <script>` run by hand. The build, publint
+  # and attw hooks run in this order (prek runs hooks sequentially) because the
+  # last two inspect the built `dist/`.
   - repo: local
     hooks:
       - id: oxlint
