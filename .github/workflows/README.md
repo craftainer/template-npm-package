@@ -82,6 +82,13 @@ Every workflow's `runs-on` defaults to `ubuntu-24.04` but can be
 overridden with the `CI_RUNNER` repository/organization variable —
 e.g. to point at self-hosted runners.
 
+*In this template (npm).* `release.yml` itself has no image push, registry
+login or image-label step: pushing an image is the instance's own
+`make publish` / `make finalize`, both no-ops here (no image), so the "OCI
+registry" and "Image labels" sections below do not apply to this template.
+`make release-arches` prints `["amd64"]`, so the release `build` runs one
+`amd64` leg (one pure-JS tarball); `checks.yml` still runs both arches.
+
 ## Architecture matrix
 
 `checks.yml` and `release.yml`'s `build` job each run as a

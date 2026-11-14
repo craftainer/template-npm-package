@@ -30,8 +30,9 @@ corepack_version=$(sed -n 's/^COREPACK_VERSION=//p' scripts/develop.d/10-corepac
 # ACTIONS_ID_TOKEN_REQUEST_* or the other runner variables. Only the publish
 # step gets the job environment (minus GITHUB_TOKEN, ACTIONS_RUNTIME_TOKEN,
 # ACTIONS_RESULTS_URL and ACTIONS_CACHE_URL) and NPM_TOKEN, for OIDC trusted
-# publishing and provenance; it runs no dependency code (a tarball upload with
-# a pinned npm).
+# publishing and provenance, plus npm_config_dry_run / NPM_CONFIG_DRY_RUN (its
+# documented dry run; no other npm_config_* name); it runs no dependency code
+# (a tarball upload with a pinned npm).
 # NODE_AUTH_TOKEN is deliberately never forwarded: its presence, even empty,
 # breaks OIDC publishing.
 names=(RELEASE_VERSION RELEASE_TAG RELEASE_ARCH NPM_PUBLISH
@@ -40,7 +41,10 @@ case ${1:-} in
 scripts/release-publish.sh)
     # A deny-list, not an allowlist: npm reads an undocumented set of GITHUB_*
     # and RUNNER_* names for provenance, and this step runs no dependency code.
-    names+=(NPM_TOKEN)
+    # npm_config_dry_run (npm reads either case) is the documented dry run
+    # of this step; without it here a dry run on a host without pnpm would
+    # really publish.
+    names+=(NPM_TOKEN npm_config_dry_run NPM_CONFIG_DRY_RUN)
     while IFS= read -r name; do
         case $name in
         GITHUB_TOKEN | ACTIONS_RUNTIME_TOKEN | ACTIONS_RESULTS_URL | ACTIONS_CACHE_URL) ;;
@@ -55,12 +59,13 @@ for name in "${names[@]}"; do
 done
 
 # The registry installs of Corepack below run without the publish credentials
-# (`env -u`) and without lifecycle scripts.
+# and the dry run (`env -u`; a dry-run install installs nothing) and without
+# lifecycle scripts.
 exec docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/src" -w /src \
     -e HOME=/tmp/home -e COREPACK_HOME=/tmp/corepack \
     -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0 -e "COREPACK_VERSION=$corepack_version" "${env_args[@]}" \
     "$node_image" bash -c \
     'mkdir -p /tmp/bin /tmp/home /tmp/cp && PATH=/tmp/bin:$PATH
      # Node 25+ images have no Corepack; install the pinned one from npm.
-     command -v corepack >/dev/null || { env -u NPM_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN npm install --prefix /tmp/cp --ignore-scripts --no-audit --no-fund --silent "corepack@$COREPACK_VERSION" && PATH=/tmp/cp/node_modules/.bin:$PATH; }
+     command -v corepack >/dev/null || { env -u NPM_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN -u npm_config_dry_run -u NPM_CONFIG_DRY_RUN npm install --prefix /tmp/cp --ignore-scripts --no-audit --no-fund --silent "corepack@$COREPACK_VERSION" && PATH=/tmp/cp/node_modules/.bin:$PATH; }
      corepack enable --install-directory /tmp/bin && exec "$@"' -- "$@"

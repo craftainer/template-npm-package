@@ -500,9 +500,12 @@ versions already on the registry. Base's
 `scripts/release-verify-published.sh` (`make verify-published`, run through
 `release-run.sh` on the bare runner, no secrets); `release-check` installs
 the local tarball only. An instance created from this template gets both
-with the sync (`Makefile` and `scripts/release-*.sh` are template-owned); one
-that overrode `release-check` locally moves its registry install into
-`verify-published`.
+scripts with the sync (`scripts/release-*.sh` are template-owned, `replace`
+tier), but not the `Makefile`, which is instance-owned (`ignore` tier): an
+instance whose `Makefile` predates `verify-published` adds that target
+itself, calling `scripts/release-run.sh scripts/release-verify-published.sh`
+as this template's `Makefile` does; one that overrode `release-check` with
+its own registry install moves that install into `verify-published`.
 
 **Package instance checklist.** An instance that publishes a package also:
 sets `repository`, homepage and bugs URLs in its package manifest
@@ -549,6 +552,16 @@ cleanly if this repo itself is ever released. An instance's `Makefile` is
 not template-owned (it's the whole point that it differs per artifact
 type), so it's tracked like any other instance-owned file — untouched by
 this template's own sync manifest.
+
+*In this template (npm).* The paragraph above is template-base's. This
+repo's `Makefile` is not a set of no-ops: it implements every target for
+one pure-JS npm tarball (`build`, `sbom`, `publish-packages`,
+`verify-published` and `release-check` are thin callers of
+`scripts/release-*.sh`, `release-assets` checks that the tarball and its
+SPDX SBOM are in `dist/`; only `publish`, with no image, and `finalize`,
+with a single tarball and nothing to combine, are no-ops). This template's sync manifest
+does list it, under `ignore`, so a sync never overwrites or deletes an
+instance's copy.
 
 ## Template sync
 
