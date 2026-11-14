@@ -82,12 +82,17 @@ Every workflow's `runs-on` defaults to `ubuntu-24.04` but can be
 overridden with the `CI_RUNNER` repository/organization variable —
 e.g. to point at self-hosted runners.
 
+*In this template (npm).* `release.yml` itself has no image push, registry
+login or image-label step: pushing an image is the instance's own
+`make publish` / `make finalize`, both no-ops here (no image), so the "OCI
+registry" and "Image labels" sections below do not apply to this template.
+`make release-arches` prints `["amd64"]`, so the release `build` runs one
+`amd64` leg (one pure-JS tarball); `checks.yml` still runs both arches.
+
 ## Architecture matrix
 
-`checks.yml` runs as a two-leg matrix over `amd64`/`arm64`, and
-`release.yml`'s `build` job over the arches `make release-arches` prints
-(*in this template (npm)* `amd64` only: one pure-JS tarball is built once),
-every leg building/testing natively
+`checks.yml` and `release.yml`'s `build` job each run as a
+two-leg matrix over `amd64`/`arm64`, both legs building/testing natively
 — `ubuntu-24.04-arm` is a real (non-emulated) GitHub-hosted Linux arm64
 runner, free on this public repo and billed as ordinary Actions minutes
 on a private one. No QEMU is involved anywhere in this repo's CI; QEMU
@@ -99,8 +104,7 @@ Each matrix leg can be overridden independently with
 (each defaulting to the matching `ubuntu-24.04`/`ubuntu-24.04-arm`
 label) — e.g. to point either arch at a self-hosted runner instead of
 GitHub's. This is separate from the plain `CI_RUNNER` variable, which
-still overrides the single-runner jobs (`template-sync.yml`,
-`perf.yml` in an instance that has one, which this template does not,
+still overrides the single-runner jobs (`perf.yml`, `template-sync.yml`,
 and `release.yml`'s `version`/`release-check`/`release`/`publish-packages`/`verify-published` jobs) that aren't
 matrixed by arch.
 
@@ -446,21 +450,17 @@ variables/secrets, all optional:
 
 ## OCI registry
 
-`release.yml` has no registry login, push or image-name step of its own:
-any image push is the instance's `make publish` (per arch, in `build`) and
-`make finalize` (in `release`), which receive the variables below and should
-skip cleanly when `OCI_REGISTRY` is unset, so the workflow works with no
-registry configured at all. *In this template (npm)* both targets are
-no-ops: it ships no image, so it pushes nothing and these are unused. For an
-instance that does publish an image:
+`release.yml` only pushes to a registry when the `OCI_REGISTRY`
+repository/organization variable is set (e.g. `ghcr.io`,
+`docker.io`, or a private registry host) — the push step, the login
+step, and the image-name step are all skipped otherwise, so the
+workflow works with no registry configured at all. When it is set:
 
-- `OCI_REGISTRY` (variable) — the registry host (e.g. `ghcr.io`,
-  `docker.io`, or a private registry host).
 - `OCI_IMAGE_NAME` (variable, optional) — the image path within the
-  registry, e.g. `myorg/template-fastapi`; the instance's `publish`
-  chooses the default when it is unset.
+  registry, e.g. `myorg/template-fastapi`. Defaults to the repository's
+  own `owner/repo` (lowercased) if unset.
 - `OCI_REGISTRY_USERNAME` / `OCI_REGISTRY_PASSWORD` (secrets) —
-  registry credentials. Required whenever
+  credentials for `docker/login-action`. Required whenever
   `OCI_REGISTRY` is set, except to push to the repository's own GHCR
   packages (`ghcr.io/<owner>/<repo>...`): the `build` and `release`
   jobs' `GITHUB_TOKEN` has `packages: write`, so the instance's
@@ -471,10 +471,20 @@ instance that does publish an image:
 
 ## Image labels
 
-`release.yml` computes no image labels (it has no `docker/metadata-action`
-step); an image's labels are set by the instance's own build. *In this
-template (npm)* there is no image, so there are no labels: the release
-artifacts are the npm tarball and its SPDX SBOM in `dist/`.
+Both copies of the published image (the OCI tarball and, if configured,
+the registry push) carry the same label set, computed once by
+`docker/metadata-action`:
+
+- Standard `org.opencontainers.image.title` / `.description` / `.url` /
+  `.source` / `.revision` (`github.sha`) / `.created` / `.version`,
+  derived from git/GitHub context.
+- `io.github.<repository_owner>.sbom` and
+  `io.github.<repository_owner>.coverage-report` — URLs to that
+  release's SBOM and `coverage.xml` assets. Namespaced under the repo
+  owner (not `org.opencontainers.image.*`, which is reserved for the
+  spec's own keys) and derived from `github.repository_owner` alone, so
+  it's one stable prefix per org across every repo/template instance
+  that org owns, rather than a per-repo namespace to look up each time.
 
 ## npm publishing
 

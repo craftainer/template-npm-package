@@ -41,8 +41,11 @@ use_npm() {
         prefix=$(mktemp -d)
         on_exit "rm -rf '$prefix'"
         # No publish credentials and no lifecycle scripts while the registry's
-        # tarball is fetched and unpacked (publish-packages holds OIDC and NPM_TOKEN).
+        # tarball is fetched and unpacked (publish-packages holds OIDC and NPM_TOKEN),
+        # and no dry run: under npm_config_dry_run this install would install
+        # nothing, and every later `npm` would fail.
         env -u NPM_TOKEN -u ACTIONS_ID_TOKEN_REQUEST_URL -u ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            -u npm_config_dry_run -u NPM_CONFIG_DRY_RUN \
             "$NPM_BIN" install --prefix "$prefix" --ignore-scripts --no-audit --no-fund --silent "npm@$NPM_VERSION"
         NPM_BIN=$prefix/node_modules/.bin/npm
     fi

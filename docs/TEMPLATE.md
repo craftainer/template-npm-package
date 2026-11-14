@@ -545,15 +545,23 @@ The arch legs run natively, not under QEMU: `arm64` on `ubuntu-24.04-arm`,
 `amd64` on `ubuntu-24.04`, each overridable with the `CI_RUNNER_ARM64` /
 `CI_RUNNER_AMD64` repository/organization variables.
 
-*In this template (npm).* This repo's own `Makefile` implements every
-target for one pure-JS npm tarball: `build`, `sbom`, `publish-packages`,
+This repo's own `Makefile` implements every target as a documented
+no-op, since `template-base` ships no artifact — it's both a working
+example of the contract's shape and what `release.yml` needs to run
+cleanly if this repo itself is ever released. An instance's `Makefile` is
+not template-owned (it's the whole point that it differs per artifact
+type), so it's tracked like any other instance-owned file — untouched by
+this template's own sync manifest.
+
+*In this template (npm).* The paragraph above is template-base's. This
+repo's `Makefile` is not a set of no-ops: it implements every target for
+one pure-JS npm tarball (`build`, `sbom`, `publish-packages`,
 `verify-published` and `release-check` are thin callers of
 `scripts/release-*.sh`, `release-assets` checks that the tarball and its
-SPDX SBOM are in `dist/`, and `publish` (no image) and `finalize` (one
-tarball, nothing to combine) are documented no-ops. An instance's
-`Makefile` is not template-owned (it's the whole point that it differs per
-artifact type): this template's sync manifest lists it under `ignore`, so a
-sync never overwrites or deletes an instance's copy.
+SPDX SBOM are in `dist/`; only `publish`, with no image, and `finalize`,
+with a single tarball and nothing to combine, are no-ops). This template's sync manifest
+does list it, under `ignore`, so a sync never overwrites or deletes an
+instance's copy.
 
 ## Template sync
 

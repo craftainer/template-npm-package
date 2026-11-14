@@ -80,6 +80,20 @@ describe("release-run.sh (no pnpm on the host)", () => {
     },
   );
 
+  it("keeps the dry run away from the container's Corepack install", () => {
+    const dir = setup();
+    const r = spawnSync(
+      bash,
+      [join(dir, "scripts/release-run.sh"), "scripts/release-publish.sh"],
+      { cwd: dir, encoding: "utf8", env: { PATH: join(dir, "bin") } },
+    );
+    expect(r.status).toBe(0);
+    const install = readFileSync(join(dir, "docker.log"), "utf8")
+      .split("\n")
+      .find((l) => l.includes("npm install"));
+    expect(install).toContain("-u npm_config_dry_run -u NPM_CONFIG_DRY_RUN");
+  });
+
   it("forwards neither NPM_TOKEN nor runner variables to the build", () => {
     const names = forwarded("scripts/release-build.sh", {
       NPM_TOKEN: "t",
@@ -102,4 +116,49 @@ describe("release-run.sh (no pnpm on the host)", () => {
     expect(names).toContain("GITHUB_REPOSITORY");
     expect(names).not.toContain("GITHUB_TOKEN");
   });
+});
+
+// use_npm in release-lib.sh with a stub npm on PATH that reports another
+// version, so the pinned one is installed. The stub behaves like npm under
+// a dry run: `install` then installs nothing.
+describe("release-lib.sh use_npm", () => {
+  const NPM_VERSION = /^NPM_VERSION=(.+)$/m.exec(
+    readFileSync(join(root, "scripts/release-lib.sh"), "utf8"),
+  )![1]!;
+
+  it.each(["npm_config_dry_run", "NPM_CONFIG_DRY_RUN"])(
+    "still installs the pinned npm under %s=true",
+    (name) => {
+      const dir = setup();
+      writeFileSync(
+        join(dir, "bin", "npm"),
+        `#!${bash}
+case "$1" in
+  --version) echo 0.0.1 ;;
+  install) # install --prefix <dir> ... npm@<version>
+    if [ -n "\${npm_config_dry_run:-}\${NPM_CONFIG_DRY_RUN:-}" ]; then exit 0; fi
+    mkdir -p "$3/node_modules/.bin"
+    printf '#!${bash}\\necho ${NPM_VERSION}\\n' >"$3/node_modules/.bin/npm"
+    chmod +x "$3/node_modules/.bin/npm" ;;
+esac
+`,
+      );
+      chmodSync(join(dir, "bin", "npm"), 0o755);
+      for (const tool of ["env", "mktemp", "mkdir", "chmod", "rm"]) {
+        symlinkSync(which(tool), join(dir, "bin", tool));
+      }
+      const r = spawnSync(
+        bash,
+        ["-c", "source scripts/release-lib.sh && use_npm && npm --version"],
+        {
+          cwd: dir,
+          encoding: "utf8",
+          env: { PATH: join(dir, "bin"), [name]: "true" },
+        },
+      );
+      expect(r.stderr).toBe("");
+      expect(r.status).toBe(0);
+      expect(r.stdout.trim()).toBe(NPM_VERSION);
+    },
+  );
 });
