@@ -40,7 +40,10 @@ case ${1:-} in
 scripts/release-publish.sh)
     # A deny-list, not an allowlist: npm reads an undocumented set of GITHUB_*
     # and RUNNER_* names for provenance, and this step runs no dependency code.
-    names+=(NPM_TOKEN)
+    # npm_config_dry_run (npm reads either case) is the documented dry run
+    # of this step; without it here a dry run on a host without pnpm would
+    # really publish.
+    names+=(NPM_TOKEN npm_config_dry_run NPM_CONFIG_DRY_RUN)
     while IFS= read -r name; do
         case $name in
         GITHUB_TOKEN | ACTIONS_RUNTIME_TOKEN | ACTIONS_RESULTS_URL | ACTIONS_CACHE_URL) ;;
