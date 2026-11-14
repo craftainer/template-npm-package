@@ -559,9 +559,9 @@ one pure-JS npm tarball (`build`, `sbom`, `publish-packages`,
 `verify-published` and `release-check` are thin callers of
 `scripts/release-*.sh`, `release-assets` checks that the tarball and its
 SPDX SBOM are in `dist/`; only `publish`, with no image, and `finalize`,
-with a single tarball and nothing to combine, are no-ops). This template's sync manifest
-does list it, under `ignore`, so a sync never overwrites or deletes an
-instance's copy.
+with a single tarball and nothing to combine, are no-ops). This template's
+sync manifest does list it, under `ignore`, so a sync never overwrites or
+deletes an instance's copy.
 
 ## Template sync
 

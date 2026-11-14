@@ -94,14 +94,18 @@ describe("release-run.sh (no pnpm on the host)", () => {
     expect(install).toContain("-u npm_config_dry_run -u NPM_CONFIG_DRY_RUN");
   });
 
-  it("forwards neither NPM_TOKEN nor runner variables to the build", () => {
+  it("forwards neither NPM_TOKEN, the dry run nor runner variables to the build", () => {
     const names = forwarded("scripts/release-build.sh", {
       NPM_TOKEN: "t",
       GITHUB_TOKEN: "t",
       GITHUB_REPOSITORY: "o/r",
+      npm_config_dry_run: "true",
+      NPM_CONFIG_DRY_RUN: "true",
     });
     expect(names).toContain("RELEASE_VERSION");
     expect(names).not.toContain("NPM_TOKEN");
+    expect(names).not.toContain("npm_config_dry_run");
+    expect(names).not.toContain("NPM_CONFIG_DRY_RUN");
     expect(names).not.toContain("GITHUB_REPOSITORY");
     expect(names).not.toContain("GITHUB_TOKEN");
   });
