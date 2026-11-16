@@ -14,7 +14,7 @@ NPM_VERSION=11.19.1
 # renovate: datasource=docker depName=node versioning=docker
 NODE_IMAGE=node:24.22.2-trixie-slim@sha256:54f84b4cf8432b21aaffd5d3ce8d41e12cea0d10d33c09d2f3c9879d49d6b446
 # renovate: datasource=docker depName=anchore/syft
-SYFT_IMAGE=anchore/syft:v1.52.0@sha256:500e2d872ac019436926e8322b4fc1f39441d94d21f6f4046c6ff29b30e8cb02
+SYFT_IMAGE=anchore/syft:v1.57.1@sha256:03215d0e98b661d0ecbc8575dbc14d65be1743b5de5df6410aecb7e80f95b060
 
 export npm_config_update_notifier=false
 # Corepack's implicit shims prompt before downloading pnpm; there is no one
